@@ -88,7 +88,6 @@ class MGU_API {
      * Register AJAX handlers
      */
     public function register_ajax_handlers() {
-        error_log('Registering AJAX handlers');
         
         // Register AJAX actions for both logged-in and non-logged-in users
         add_action('wp_ajax_mgu_api_get_manufacturers', array($this, 'ajax_get_manufacturers'));
@@ -108,19 +107,15 @@ class MGU_API {
      * AJAX handler for getting manufacturers
      */
     public function ajax_get_manufacturers() {
-        error_log('AJAX request received for manufacturers');
-        error_log('POST data: ' . print_r($_POST, true));
         
         // Verify nonce
         if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'mgu_api_nonce')) {
-            error_log('Nonce verification failed');
             wp_send_json_error('Invalid security token');
             return;
         }
         
         $gadget_type = isset($_POST['gadget_type']) ? sanitize_text_field($_POST['gadget_type']) : '';
         if (empty($gadget_type)) {
-            error_log('No gadget type provided');
             wp_send_json_error('Gadget type is required');
             return;
         }
@@ -129,12 +124,10 @@ class MGU_API {
         $response = $api_client->get_manufacturers($gadget_type);
         
         if (is_wp_error($response)) {
-            error_log('API Error: ' . $response->get_error_message());
             wp_send_json_error($response->get_error_message());
             return;
         }
         
-        error_log('API Response: ' . print_r($response, true));
         wp_send_json_success($response);
     }
 
@@ -142,12 +135,10 @@ class MGU_API {
      * AJAX handler for getting models
      */
     public function ajax_get_models() {
-        error_log('AJAX request received for models');
-        error_log('POST data: ' . print_r($_POST, true));
+
         
         // Verify nonce
         if (!check_ajax_referer('mgu_api_nonce', 'nonce', false)) {
-            error_log('Nonce verification failed for models request');
             wp_send_json_error('Invalid security token');
             return;
         }
@@ -156,13 +147,11 @@ class MGU_API {
         $gadget_type = isset($_POST['gadget_type']) ? sanitize_text_field($_POST['gadget_type']) : '';
         
         if (empty($manufacturer_id)) {
-            error_log('No manufacturer ID provided');
             wp_send_json_error('Manufacturer ID is required');
             return;
         }
         
         if (empty($gadget_type)) {
-            error_log('No gadget type provided');
             wp_send_json_error('Gadget type is required');
             return;
         }
@@ -171,7 +160,6 @@ class MGU_API {
         $response = $api_client->get_models($manufacturer_id, $gadget_type);
         
         if (is_wp_error($response)) {
-            error_log('API Error: ' . $response->get_error_message());
             wp_send_json_error($response->get_error_message());
             return;
         }
@@ -250,11 +238,6 @@ class MGU_API {
      * @since    1.0.0
      */
     public function register_settings() {
-        error_log('=== Starting Settings Registration ===');
-        error_log('Current endpoint value: ' . get_option('mgu_api_endpoint'));
-        error_log('Current client_id value: ' . get_option('mgu_api_client_id'));
-        error_log('Current client_secret value: ' . (get_option('mgu_api_client_secret') ? 'exists' : 'empty'));
-
         register_setting('mgu_api_options', 'mgu_api_endpoint', array(
             'type' => 'string',
             'sanitize_callback' => array($this, 'sanitize_endpoint'),
@@ -272,9 +255,6 @@ class MGU_API {
             'sanitize_callback' => array($this, 'sanitize_client_secret'),
             'default' => ''
         ));
-
-        error_log('Settings registered with WordPress');
-        error_log('=== End Settings Registration ===');
 
         add_settings_section(
             'mgu_api_main_section',
@@ -441,10 +421,8 @@ class MGU_API {
      * Enqueue scripts and styles for the public-facing side of the site.
      */
     public function enqueue_scripts() {
-        error_log('Enqueuing scripts for MGU API Integration');
-        
+
         $nonce = wp_create_nonce('mgu_api_nonce');
-        error_log('Created nonce for AJAX: ' . $nonce);
 
         wp_enqueue_script(
             'mgu-api-test-flow',
@@ -458,8 +436,7 @@ class MGU_API {
             'ajax_url' => admin_url('admin-ajax.php'),
             'nonce' => $nonce
         );
-        error_log('Localizing script with data: ' . print_r($localized_data, true));
-
+ 
         wp_localize_script(
             'mgu-api-test-flow',
             'mgu_api',
@@ -499,23 +476,17 @@ class MGU_API {
     }
 
     public function sanitize_client_id($input) {
-        error_log('Sanitizing client_id: ' . $input);
         $sanitized = sanitize_text_field($input);
-        error_log('Sanitized client_id: ' . $sanitized);
         return $sanitized;
     }
 
     public function sanitize_endpoint($input) {
-        error_log('Sanitizing endpoint: ' . $input);
         $sanitized = esc_url_raw($input);
-        error_log('Sanitized endpoint: ' . $sanitized);
         return $sanitized;
     }
 
     public function sanitize_client_secret($input) {
-        error_log('Sanitizing client_secret: ' . ($input ? 'exists' : 'empty'));
         $sanitized = sanitize_text_field($input);
-        error_log('Sanitized client_secret: ' . ($sanitized ? 'exists' : 'empty'));
         return $sanitized;
     }
 } 
