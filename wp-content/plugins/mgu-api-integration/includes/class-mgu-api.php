@@ -1,0 +1,521 @@
+<?php
+/**
+ * The main plugin class.
+ *
+ * @since      1.0.0
+ * @package    MGU_API_Integration
+ */
+
+class MGU_API {
+
+    /**
+     * The loader that's responsible for maintaining and registering all hooks that power
+     * the plugin.
+     *
+     * @since    1.0.0
+     * @access   protected
+     * @var      MGU_API_Loader    $loader    Maintains and registers all hooks for the plugin.
+     */
+    protected $loader;
+
+    /**
+     * Initialize the class and set its properties.
+     */
+    public function __construct() {
+        // Enable WordPress debug logging
+        if (!defined('WP_DEBUG')) {
+            define('WP_DEBUG', true);
+        }
+        if (!defined('WP_DEBUG_LOG')) {
+            define('WP_DEBUG_LOG', true);
+        }
+        if (!defined('WP_DEBUG_DISPLAY')) {
+            define('WP_DEBUG_DISPLAY', false);
+        }
+        
+        $this->plugin_name = 'mgu-api-integration';
+        $this->version = '1.0.0';
+        
+        $this->load_dependencies();
+        $this->define_admin_hooks();
+        $this->define_public_hooks();
+        $this->register_ajax_handlers();
+        $this->register_shortcodes();
+    }
+
+    /**
+     * Load the required dependencies for this plugin.
+     *
+     * @since    1.0.0
+     * @access   private
+     */
+    private function load_dependencies() {
+        $this->loader = new MGU_API_Loader();
+    }
+
+    /**
+     * Register all of the hooks related to the admin area functionality
+     * of the plugin.
+     *
+     * @since    1.0.0
+     * @access   private
+     */
+    private function define_admin_hooks() {
+        // Add admin menu
+        $this->loader->add_action('admin_menu', $this, 'add_plugin_admin_menu');
+        
+        // Add Settings link to the plugin
+        $this->loader->add_filter('plugin_action_links_' . MGU_API_PLUGIN_BASENAME, $this, 'add_action_links');
+
+        // Register settings
+        $this->loader->add_action('admin_init', $this, 'register_settings');
+    }
+
+    /**
+     * Register all of the hooks related to the public-facing functionality
+     * of the plugin.
+     */
+    private function define_public_hooks() {
+        $plugin_public = new MGU_API_Public($this->get_plugin_name(), $this->get_version());
+        
+        error_log('Registering public hooks for MGU API Integration');
+        
+        $this->loader->add_action('wp_enqueue_scripts', $plugin_public, 'enqueue_styles');
+        $this->loader->add_action('wp_enqueue_scripts', $plugin_public, 'enqueue_scripts');
+    }
+
+    /**
+     * Register AJAX handlers
+     */
+    public function register_ajax_handlers() {
+        error_log('Registering AJAX handlers');
+        
+        // Register AJAX actions for both logged-in and non-logged-in users
+        add_action('wp_ajax_mgu_api_get_manufacturers', array($this, 'ajax_get_manufacturers'));
+        add_action('wp_ajax_nopriv_mgu_api_get_manufacturers', array($this, 'ajax_get_manufacturers'));
+        
+        add_action('wp_ajax_mgu_api_get_models', array($this, 'ajax_get_models'));
+        add_action('wp_ajax_nopriv_mgu_api_get_models', array($this, 'ajax_get_models'));
+        
+        add_action('wp_ajax_mgu_api_get_quote', array($this, 'ajax_get_quote'));
+        add_action('wp_ajax_nopriv_mgu_api_get_quote', array($this, 'ajax_get_quote'));
+        
+        add_action('wp_ajax_mgu_api_create_policy', array($this, 'ajax_create_policy'));
+        add_action('wp_ajax_nopriv_mgu_api_create_policy', array($this, 'ajax_create_policy'));
+    }
+
+    /**
+     * AJAX handler for getting manufacturers
+     */
+    public function ajax_get_manufacturers() {
+        error_log('AJAX request received for manufacturers');
+        error_log('POST data: ' . print_r($_POST, true));
+        
+        // Verify nonce
+        if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'mgu_api_nonce')) {
+            error_log('Nonce verification failed');
+            wp_send_json_error('Invalid security token');
+            return;
+        }
+        
+        $gadget_type = isset($_POST['gadget_type']) ? sanitize_text_field($_POST['gadget_type']) : '';
+        if (empty($gadget_type)) {
+            error_log('No gadget type provided');
+            wp_send_json_error('Gadget type is required');
+            return;
+        }
+        
+        $api_client = new MGU_API_Client();
+        $response = $api_client->get_manufacturers($gadget_type);
+        
+        if (is_wp_error($response)) {
+            error_log('API Error: ' . $response->get_error_message());
+            wp_send_json_error($response->get_error_message());
+            return;
+        }
+        
+        error_log('API Response: ' . print_r($response, true));
+        wp_send_json_success($response);
+    }
+
+    /**
+     * AJAX handler for getting models
+     */
+    public function ajax_get_models() {
+        error_log('AJAX request received for models');
+        error_log('POST data: ' . print_r($_POST, true));
+        
+        // Verify nonce
+        if (!check_ajax_referer('mgu_api_nonce', 'nonce', false)) {
+            error_log('Nonce verification failed for models request');
+            wp_send_json_error('Invalid security token');
+            return;
+        }
+        
+        $manufacturer_id = isset($_POST['manufacturer_id']) ? sanitize_text_field($_POST['manufacturer_id']) : '';
+        $gadget_type = isset($_POST['gadget_type']) ? sanitize_text_field($_POST['gadget_type']) : '';
+        
+        if (empty($manufacturer_id)) {
+            error_log('No manufacturer ID provided');
+            wp_send_json_error('Manufacturer ID is required');
+            return;
+        }
+        
+        if (empty($gadget_type)) {
+            error_log('No gadget type provided');
+            wp_send_json_error('Gadget type is required');
+            return;
+        }
+        
+        $api_client = new MGU_API_Client();
+        $response = $api_client->get_models($manufacturer_id, $gadget_type);
+        
+        if (is_wp_error($response)) {
+            error_log('API Error: ' . $response->get_error_message());
+            wp_send_json_error($response->get_error_message());
+            return;
+        }
+        
+        error_log('API Response: ' . print_r($response, true));
+        wp_send_json_success($response);
+    }
+
+    /**
+     * AJAX handler for getting a quote
+     */
+    public function ajax_get_quote() {
+        error_log('AJAX request received for quote');
+        error_log('POST data: ' . print_r($_POST, true));
+        
+        // Verify nonce
+        if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'mgu_api_nonce')) {
+            error_log('Nonce verification failed for quote request');
+            wp_send_json_error('Invalid security token');
+            return;
+        }
+        
+        $device_data = isset($_POST['device_data']) ? $_POST['device_data'] : array();
+        if (empty($device_data)) {
+            error_log('No device data provided');
+            wp_send_json_error('Device data is required');
+            return;
+        }
+        
+        $api_client = new MGU_API_Client();
+        $response = $api_client->get_quote($device_data);
+        
+        if (is_wp_error($response)) {
+            error_log('API Error: ' . $response->get_error_message());
+            wp_send_json_error($response->get_error_message());
+            return;
+        }
+        
+        error_log('API Response: ' . print_r($response, true));
+        wp_send_json_success($response);
+    }
+
+    /**
+     * AJAX handler for creating a policy
+     */
+    public function ajax_create_policy() {
+        check_ajax_referer('mgu_api_nonce', 'nonce');
+        
+        $policy_data = isset($_POST['policy_data']) ? $_POST['policy_data'] : array();
+        if (empty($policy_data)) {
+            wp_send_json_error('Policy data is required');
+        }
+        
+        $api_client = new MGU_API_Client();
+        $response = $api_client->create_policy($policy_data);
+        
+        if (is_wp_error($response)) {
+            wp_send_json_error($response->get_error_message());
+        }
+        
+        wp_send_json_success($response);
+    }
+
+    /**
+     * Run the loader to execute all of the hooks with WordPress.
+     *
+     * @since    1.0.0
+     */
+    public function run() {
+        $this->loader->run();
+    }
+
+    /**
+     * Register all settings
+     *
+     * @since    1.0.0
+     */
+    public function register_settings() {
+        error_log('=== Starting Settings Registration ===');
+        error_log('Current endpoint value: ' . get_option('mgu_api_endpoint'));
+        error_log('Current client_id value: ' . get_option('mgu_api_client_id'));
+        error_log('Current client_secret value: ' . (get_option('mgu_api_client_secret') ? 'exists' : 'empty'));
+
+        register_setting('mgu_api_options', 'mgu_api_endpoint', array(
+            'type' => 'string',
+            'sanitize_callback' => array($this, 'sanitize_endpoint'),
+            'default' => 'https://sandbox.api.mygadgetumbrella.com'
+        ));
+
+        register_setting('mgu_api_options', 'mgu_api_client_id', array(
+            'type' => 'string',
+            'sanitize_callback' => array($this, 'sanitize_client_id'),
+            'default' => 'APITEST001'
+        ));
+
+        register_setting('mgu_api_options', 'mgu_api_client_secret', array(
+            'type' => 'string',
+            'sanitize_callback' => array($this, 'sanitize_client_secret'),
+            'default' => ''
+        ));
+
+        error_log('Settings registered with WordPress');
+        error_log('=== End Settings Registration ===');
+
+        add_settings_section(
+            'mgu_api_main_section',
+            __('API Configuration', 'mgu-api-integration'),
+            array($this, 'section_callback'),
+            'mgu_api_options'
+        );
+
+        add_settings_field(
+            'mgu_api_endpoint',
+            'API Endpoint',
+            array($this, 'endpoint_field_callback'),
+            'mgu_api_options',
+            'mgu_api_main_section'
+        );
+
+        add_settings_field(
+            'mgu_api_client_id',
+            'Client ID',
+            array($this, 'client_id_field_callback'),
+            'mgu_api_options',
+            'mgu_api_main_section'
+        );
+
+        add_settings_field(
+            'mgu_api_client_secret',
+            'Client Secret',
+            array($this, 'client_secret_field_callback'),
+            'mgu_api_options',
+            'mgu_api_main_section'
+        );
+    }
+
+    /**
+     * Settings section callback
+     *
+     * @since    1.0.0
+     */
+    public function section_callback() {
+        echo '<p>' . __('Configure your MGU API settings below.', 'mgu-api-integration') . '</p>';
+    }
+
+    /**
+     * API Endpoint field callback
+     *
+     * @since    1.0.0
+     */
+    public function endpoint_field_callback() {
+        $endpoint = get_option('mgu_api_endpoint');
+        echo '<input type="url" name="mgu_api_endpoint" value="' . esc_attr($endpoint) . '" class="regular-text" />';
+        echo '<p class="description">' . __('Enter the base URL for the MGU API (e.g., https://sandbox.api.mygadgetumbrella.com)', 'mgu-api-integration') . '</p>';
+    }
+
+    /**
+     * Client ID field callback
+     *
+     * @since    1.0.0
+     */
+    public function client_id_field_callback() {
+        $client_id = get_option('mgu_api_client_id');
+        echo '<input type="text" name="mgu_api_client_id" value="' . esc_attr($client_id) . '" class="regular-text" />';
+        echo '<p class="description">' . __('Enter your MGU API Client ID', 'mgu-api-integration') . '</p>';
+    }
+
+    /**
+     * Client Secret field callback
+     *
+     * @since    1.0.0
+     */
+    public function client_secret_field_callback() {
+        $client_secret = get_option('mgu_api_client_secret');
+        $display_secret = '';
+        
+        if (!empty($client_secret)) {
+            // Show first 4 and last 4 characters, mask the rest
+            $length = strlen($client_secret);
+            if ($length > 8) {
+                $display_secret = substr($client_secret, 0, 4) . str_repeat('•', $length - 8) . substr($client_secret, -4);
+            } else {
+                $display_secret = str_repeat('•', $length);
+            }
+        }
+        
+        echo '<input type="password" name="mgu_api_client_secret" value="' . esc_attr($client_secret) . '" class="regular-text" />';
+        if (!empty($display_secret)) {
+            echo '<p class="description">' . __('Current secret: ', 'mgu-api-integration') . esc_html($display_secret) . '</p>';
+        }
+        echo '<p class="description">' . __('Enter your MGU API Client Secret', 'mgu-api-integration') . '</p>';
+    }
+
+    /**
+     * Add options page
+     *
+     * @since    1.0.0
+     */
+    public function add_plugin_admin_menu() {
+        add_menu_page(
+            'MGU API Integration',
+            'MGU API',
+            'manage_options',
+            'mgu-api-integration',
+            array($this, 'display_plugin_admin_page'),
+            'dashicons-rest-api',
+            81
+        );
+
+        add_submenu_page(
+            'mgu-api-integration',
+            'API Test',
+            'API Test',
+            'manage_options',
+            'mgu-api-test',
+            array($this, 'display_test_page')
+        );
+    }
+
+    /**
+     * Render the settings page for this plugin.
+     *
+     * @since    1.0.0
+     */
+    public function display_plugin_admin_page() {
+        include_once MGU_API_PLUGIN_DIR . 'admin/partials/mgu-api-admin-display.php';
+    }
+
+    /**
+     * Render the test page.
+     *
+     * @since    1.0.0
+     */
+    public function display_test_page() {
+        include_once MGU_API_PLUGIN_DIR . 'admin/partials/mgu-api-test-display.php';
+    }
+
+    /**
+     * Add settings action link to the plugins page.
+     *
+     * @since    1.0.0
+     */
+    public function add_action_links($links) {
+        $settings_link = array(
+            '<a href="' . admin_url('admin.php?page=mgu-api-integration') . '">' . __('Settings', 'mgu-api-integration') . '</a>',
+        );
+        return array_merge($settings_link, $links);
+    }
+
+    /**
+     * Register shortcodes
+     */
+    public function register_shortcodes() {
+        add_shortcode('mgu_api_test_flow', array($this, 'render_test_flow'));
+    }
+
+    /**
+     * Render the test flow
+     */
+    public function render_test_flow() {
+        ob_start();
+        include MGU_API_PLUGIN_DIR . 'public/partials/mgu-api-test-flow.php';
+        return ob_get_clean();
+    }
+
+    /**
+     * Enqueue scripts and styles for the public-facing side of the site.
+     */
+    public function enqueue_scripts() {
+        error_log('Enqueuing scripts for MGU API Integration');
+        
+        $nonce = wp_create_nonce('mgu_api_nonce');
+        error_log('Created nonce for AJAX: ' . $nonce);
+
+        wp_enqueue_script(
+            'mgu-api-test-flow',
+            MGU_API_PLUGIN_URL . 'public/js/mgu-api-test-flow.js',
+            array('jquery'),
+            MGU_API_VERSION,
+            true
+        );
+
+        $localized_data = array(
+            'ajax_url' => admin_url('admin-ajax.php'),
+            'nonce' => $nonce
+        );
+        error_log('Localizing script with data: ' . print_r($localized_data, true));
+
+        wp_localize_script(
+            'mgu-api-test-flow',
+            'mgu_api',
+            $localized_data
+        );
+    }
+
+    /**
+     * The name of the plugin used to uniquely identify it within the context of
+     * WordPress and to define internationalization functionality.
+     *
+     * @since     1.0.0
+     * @return    string    The name of the plugin.
+     */
+    public function get_plugin_name() {
+        return $this->plugin_name;
+    }
+
+    /**
+     * The reference to the class that orchestrates the hooks with the plugin.
+     *
+     * @since     1.0.0
+     * @return    MGU_API_Loader    Orchestrates the hooks of the plugin.
+     */
+    public function get_loader() {
+        return $this->loader;
+    }
+
+    /**
+     * Retrieve the version number of the plugin.
+     *
+     * @since     1.0.0
+     * @return    string    The version number of the plugin.
+     */
+    public function get_version() {
+        return $this->version;
+    }
+
+    public function sanitize_client_id($input) {
+        error_log('Sanitizing client_id: ' . $input);
+        $sanitized = sanitize_text_field($input);
+        error_log('Sanitized client_id: ' . $sanitized);
+        return $sanitized;
+    }
+
+    public function sanitize_endpoint($input) {
+        error_log('Sanitizing endpoint: ' . $input);
+        $sanitized = esc_url_raw($input);
+        error_log('Sanitized endpoint: ' . $sanitized);
+        return $sanitized;
+    }
+
+    public function sanitize_client_secret($input) {
+        error_log('Sanitizing client_secret: ' . ($input ? 'exists' : 'empty'));
+        $sanitized = sanitize_text_field($input);
+        error_log('Sanitized client_secret: ' . ($sanitized ? 'exists' : 'empty'));
+        return $sanitized;
+    }
+} 
