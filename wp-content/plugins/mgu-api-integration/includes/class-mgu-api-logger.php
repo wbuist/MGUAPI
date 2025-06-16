@@ -85,7 +85,8 @@ class MGU_API_Logger {
      * @param    array     $context    Additional context data.
      */
     public static function debug($message, $context = array()) {
-        self::log($message, self::DEBUG, $context);
+        // Debug logging disabled
+        return;
     }
 
     /**

@@ -59,33 +59,12 @@ class MGU_API_Client {
      * @since    1.0.0
      */
     public function __construct() {
-        // error_log('=== API Client Initialization ===');
-        // error_log('Raw endpoint option: ' . get_option('mgu_api_endpoint'));
-        // error_log('Raw client_id option: ' . get_option('mgu_api_client_id'));
-        // error_log('Raw client_secret option: ' . (get_option('mgu_api_client_secret') ? 'exists' : 'empty'));
-
         $raw_client_id = get_option('mgu_api_client_id');
-        // error_log('Raw client_id before assignment: ' . $raw_client_id);
-        // error_log('Raw client_id type: ' . gettype($raw_client_id));
-        // error_log('Raw client_id length: ' . strlen($raw_client_id));
-        
         $this->endpoint = get_option('mgu_api_endpoint', '');
         $this->client_id = $raw_client_id;  // Use the raw value we already retrieved
         $this->client_secret = get_option('mgu_api_client_secret', '');
-        
-        // error_log('Client ID after assignment: ' . $this->client_id);
-        // error_log('Client ID type: ' . gettype($this->client_id));
-        // error_log('Client ID length: ' . strlen($this->client_id));
-        // error_log('Client ID empty check: ' . (empty($this->client_id) ? 'true' : 'false'));
-        
         $this->access_token = '';
         $this->logger = new MGU_API_Logger();
-        
-        // error_log('API Client initialized with values:');
-        // error_log('- endpoint: ' . $this->endpoint);
-        // error_log('- client_id: ' . $this->client_id);
-        // error_log('- has_client_secret: ' . (!empty($this->client_secret) ? 'yes' : 'no'));
-        // error_log('=== End API Client Initialization ===');
     }
 
     /**
@@ -103,27 +82,16 @@ class MGU_API_Client {
      * Refresh the access token
      */
     private function refresh_token() {
-        error_log('=== Token Refresh ===');
-        error_log('Checking configuration:');
-        error_log('- endpoint: ' . $this->endpoint);
-        error_log('- client_id: ' . $this->client_id);
-        error_log('- client_secret exists: ' . (!empty($this->client_secret) ? 'yes' : 'no'));
-        
         if (empty($this->endpoint) || empty($this->client_id) || empty($this->client_secret)) {
             $this->logger->error('API configuration missing', array(
                 'has_endpoint' => !empty($this->endpoint),
                 'has_client_id' => !empty($this->client_id),
                 'has_client_secret' => !empty($this->client_secret)
             ));
-            error_log('ERROR: Missing configuration');
-            error_log('- endpoint empty: ' . (empty($this->endpoint) ? 'yes' : 'no'));
-            error_log('- client_id empty: ' . (empty($this->client_id) ? 'yes' : 'no'));
-            error_log('- client_secret empty: ' . (empty($this->client_secret) ? 'yes' : 'no'));
             return false;
         }
 
         $auth_url = rtrim($this->endpoint, '/') . '/sbauth/oauth/token';
-        error_log('Auth URL: ' . $auth_url);
         
         $this->logger->debug('Requesting new token', array(
             'auth_url' => $auth_url,
@@ -144,17 +112,14 @@ class MGU_API_Client {
 
         if (is_wp_error($response)) {
             $this->logger->error('Token refresh failed: ' . $response->get_error_message());
-            error_log('ERROR: Token refresh failed - ' . $response->get_error_message());
             return false;
         }
 
         $body = wp_remote_retrieve_body($response);
         $data = json_decode($body, true);
-        error_log('Token response: ' . print_r($data, true));
 
         if (empty($data['access_token'])) {
             $this->logger->error('Invalid token response', array('response' => $data));
-            error_log('ERROR: Invalid token response');
             return false;
         }
 
@@ -164,8 +129,6 @@ class MGU_API_Client {
         $this->logger->info('Token refreshed successfully', array(
             'expires_in' => $data['expires_in']
         ));
-        error_log('Token refreshed successfully');
-        error_log('=== End Token Refresh ===');
 
         return true;
     }
@@ -181,9 +144,6 @@ class MGU_API_Client {
      */
     private function make_request($endpoint, $method = 'GET', $data = array()) {
         if (empty($this->endpoint) || empty($this->client_id)) {
-            error_log('ERROR: API endpoint or key not configured');
-            error_log('- endpoint empty: ' . (empty($this->endpoint) ? 'yes' : 'no'));
-            error_log('- client_id empty: ' . (empty($this->client_id) ? 'yes' : 'no'));
             return new WP_Error('config_error', 'API endpoint or key not configured');
         }
 
@@ -193,10 +153,6 @@ class MGU_API_Client {
         if ($method === 'GET' && !empty($data)) {
             $url = add_query_arg($data, $url);
         }
-        
-        error_log('Making API request to: ' . $url);
-        error_log('Request method: ' . $method);
-        error_log('Request data: ' . print_r($data, true));
 
         // Get a valid token
         $token = $this->get_valid_token();
@@ -221,16 +177,12 @@ class MGU_API_Client {
         $response = wp_remote_request($url, $args);
 
         if (is_wp_error($response)) {
-            error_log('API request failed: ' . $response->get_error_message());
             return $response;
         }
 
         $response_code = wp_remote_retrieve_response_code($response);
         $body = wp_remote_retrieve_body($response);
         $data = json_decode($body, true);
-
-        error_log('API response code: ' . $response_code);
-        error_log('API response body: ' . $body);
 
         // Handle token expiration
         if ($response_code === 401) {
@@ -241,8 +193,6 @@ class MGU_API_Client {
 
         if ($response_code >= 400) {
             $error_message = isset($data['message']) ? $data['message'] : 'Unknown error';
-            error_log('API error response: ' . $error_message);
-            error_log('API error data: ' . print_r($data, true));
             return new WP_Error('api_error', $error_message, $data);
         }
 
@@ -345,18 +295,29 @@ class MGU_API_Client {
      * @return array|WP_Error
      */
     public function get_models($manufacturer_id, $gadget_type) {
-        $this->logger->debug('Getting models', array(
-            'manufacturer_id' => $manufacturer_id,
-            'gadget_type' => $gadget_type
-        ));
+        // error_log('=== Models Request Debug ===');
+        // error_log('Manufacturer ID: ' . $manufacturer_id);
+        // error_log('Gadget Type: ' . $gadget_type);
         
         // For GET requests, we need to append the parameters to the URL
-        $endpoint = 'models?' . http_build_query(array(
+        $endpoint = '/sbapi/v1/models?' . http_build_query(array(
             'ManufacturerId' => $manufacturer_id,
             'GadgetType' => $gadget_type
         ));
         
-        return $this->make_request($endpoint, 'GET');
+        // error_log('Full endpoint: ' . $endpoint);
+        
+        $response = $this->make_request($endpoint, 'GET');
+        
+        if (is_wp_error($response)) {
+            // error_log('Models Error: ' . $response->get_error_message());
+        } else {
+            // error_log('Models Response: ' . print_r($response, true));
+        }
+        
+        // error_log('=== End Models Request Debug ===');
+        
+        return $response;
     }
 
     /**
