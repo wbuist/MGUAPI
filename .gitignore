@@ -16,6 +16,7 @@ wp-content/*
 !wp-content/plugins/
 wp-content/plugins/*
 !wp-content/plugins/mguapi/
+!wp-content/plugins/mgu-api-integration/
 
 # Logs and databases
 *.log
