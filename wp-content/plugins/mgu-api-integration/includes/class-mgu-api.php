@@ -99,6 +99,9 @@ class MGU_API {
         add_action('wp_ajax_mgu_api_get_quote', array($this, 'ajax_get_quote'));
         add_action('wp_ajax_nopriv_mgu_api_get_quote', array($this, 'ajax_get_quote'));
         
+        add_action('wp_ajax_mgu_api_create_customer', array($this, 'ajax_create_customer'));
+        add_action('wp_ajax_nopriv_mgu_api_create_customer', array($this, 'ajax_create_customer'));
+        
         add_action('wp_ajax_mgu_api_create_policy', array($this, 'ajax_create_policy'));
         add_action('wp_ajax_nopriv_mgu_api_create_policy', array($this, 'ajax_create_policy'));
     }
@@ -188,6 +191,13 @@ class MGU_API {
             wp_send_json_error('Device data is required');
             return;
         }
+
+        // Validate required fields
+        if (empty($device_data['ManufacturerID']) || empty($device_data['GadgetType']) || empty($device_data['Model'])) {
+            error_log('Missing required fields in device data: ' . print_r($device_data, true));
+            wp_send_json_error('Manufacturer ID, Gadget Type, and Model are required');
+            return;
+        }
         
         $api_client = new MGU_API_Client();
         $response = $api_client->get_quote($device_data);
@@ -198,7 +208,59 @@ class MGU_API {
             return;
         }
         
-        error_log('API Response: ' . print_r($response, true));
+        error_log('Raw API Response: ' . print_r($response, true));
+        error_log('Response type: ' . gettype($response));
+        if (is_array($response)) {
+            error_log('Response keys: ' . implode(', ', array_keys($response)));
+        }
+        
+        wp_send_json_success($response);
+    }
+
+    /**
+     * AJAX handler for creating a customer
+     */
+    public function ajax_create_customer() {
+        error_log('=== Customer Creation Debug ===');
+        error_log('AJAX request received for customer creation');
+        error_log('POST data: ' . print_r($_POST, true));
+        
+        // Verify nonce
+        if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'mgu_api_nonce')) {
+            error_log('Nonce verification failed for customer creation');
+            wp_send_json_error('Invalid security token');
+            return;
+        }
+        
+        $customer_data = isset($_POST['customer_data']) ? $_POST['customer_data'] : array();
+        if (empty($customer_data)) {
+            error_log('No customer data provided');
+            wp_send_json_error('Customer data is required');
+            return;
+        }
+
+        // Validate required fields
+        $required_fields = array('first_name', 'last_name', 'email', 'phone');
+        foreach ($required_fields as $field) {
+            if (empty($customer_data[$field])) {
+                error_log("Missing required field: {$field}");
+                wp_send_json_error("Missing required field: {$field}");
+                return;
+            }
+        }
+        
+        error_log('Customer data validated, calling API client');
+        $api_client = new MGU_API_Client();
+        $response = $api_client->create_customer($customer_data);
+        
+        if (is_wp_error($response)) {
+            error_log('API Error: ' . $response->get_error_message());
+            wp_send_json_error($response->get_error_message());
+            return;
+        }
+        
+        error_log('Customer creation response: ' . print_r($response, true));
+        error_log('=== End Customer Creation Debug ===');
         wp_send_json_success($response);
     }
 
@@ -206,20 +268,46 @@ class MGU_API {
      * AJAX handler for creating a policy
      */
     public function ajax_create_policy() {
-        check_ajax_referer('mgu_api_nonce', 'nonce');
+        error_log('=== Policy Creation Debug ===');
+        error_log('AJAX request received for policy creation');
+        error_log('POST data: ' . print_r($_POST, true));
+        
+        // Verify nonce
+        if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'mgu_api_nonce')) {
+            error_log('Nonce verification failed for policy creation');
+            wp_send_json_error('Invalid security token');
+            return;
+        }
         
         $policy_data = isset($_POST['policy_data']) ? $_POST['policy_data'] : array();
         if (empty($policy_data)) {
+            error_log('No policy data provided');
             wp_send_json_error('Policy data is required');
+            return;
+        }
+
+        // Validate required fields
+        $required_fields = array('customer_id', 'quote_option_id', 'device_data');
+        foreach ($required_fields as $field) {
+            if (empty($policy_data[$field])) {
+                error_log("Missing required field: {$field}");
+                wp_send_json_error("Missing required field: {$field}");
+                return;
+            }
         }
         
+        error_log('Policy data validated, calling API client');
         $api_client = new MGU_API_Client();
         $response = $api_client->create_policy($policy_data);
         
         if (is_wp_error($response)) {
+            error_log('API Error: ' . $response->get_error_message());
             wp_send_json_error($response->get_error_message());
+            return;
         }
         
+        error_log('Policy creation response: ' . print_r($response, true));
+        error_log('=== End Policy Creation Debug ===');
         wp_send_json_success($response);
     }
 

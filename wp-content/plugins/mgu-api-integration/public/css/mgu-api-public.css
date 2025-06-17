@@ -123,4 +123,45 @@
 .mgu-api-quote-details p {
     margin: 0.5em 0;
     color: #666;
+}
+
+.mgu-api-quote-options {
+    margin: 1em 0;
+}
+
+.mgu-api-quote-option {
+    margin-bottom: 1.5em;
+    padding: 1.5em;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: #fff;
+}
+
+.mgu-api-quote-option.selected {
+    border-color: #0073aa;
+    box-shadow: 0 0 5px rgba(0, 115, 170, 0.3);
+}
+
+.mgu-api-quote-option h4 {
+    margin-top: 0;
+    color: #333;
+    font-size: 1.2em;
+}
+
+.mgu-api-quote-option .mgu-api-quote-details {
+    margin-top: 1em;
+}
+
+.mgu-api-quote-option .mgu-api-quote-details p {
+    margin: 0.5em 0;
+    color: #666;
+}
+
+.mgu-api-quote-option .select-option {
+    margin-top: 1em;
+}
+
+#accept-quote {
+    display: none;
+    margin-top: 1em;
 } 

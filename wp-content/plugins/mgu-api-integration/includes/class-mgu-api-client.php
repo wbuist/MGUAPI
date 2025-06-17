@@ -400,7 +400,11 @@ class MGU_API_Client {
      * @return array|WP_Error
      */
     public function get_quote($device_data) {
-        return $this->make_request('quotes', 'POST', $device_data);
+        return $this->make_request('/sbapi/v1/gadgetPremiums', 'GET', array(
+            'ManufacturerId' => $device_data['ManufacturerID'],
+            'GadgetType' => $device_data['GadgetType'],
+            'Model' => $device_data['Model']
+        ));
     }
 
     /**

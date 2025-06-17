@@ -4,7 +4,9 @@ jQuery(document).ready(function($) {
     console.log('Nonce:', mgu_api.nonce);
 
     let currentGadgetType = '';
-    let currentQuoteId = '';
+    let currentQuoteId = null;
+    let selectedQuoteOption = null;
+    let quoteOptions = [];
 
     // Handle gadget type selection
     $('#gadget-type-select').on('change', function() {
@@ -123,84 +125,238 @@ jQuery(document).ready(function($) {
 
         console.log('Submitting device data:', deviceData);
 
+        getQuote(deviceData);
+    });
+
+    // Function to get quote
+    function getQuote(deviceData) {
+        console.log('Sending quote request with data:', deviceData);
+        
+        // Clear any previous error messages
+        $('.mgu-api-step-result').removeClass('error success').empty();
+        
         $.ajax({
             url: mgu_api.ajax_url,
             type: 'POST',
             data: {
                 action: 'mgu_api_get_quote',
-                device_data: deviceData,
+                device_data: {
+                    ManufacturerID: deviceData.ManufacturerID,
+                    GadgetType: deviceData.GadgetType,
+                    Model: deviceData.Model
+                },
                 nonce: mgu_api.nonce
             },
             success: function(response) {
-                console.log('Quote response:', response);
-                if (response.success && response.data) {
+                console.log('Quote response received:', response);
+                if (response.success && response.data && response.data.value) {
+                    console.log('Quote data:', response.data);
+                    displayQuote(response.data);
                     $('#step-quote').show();
-                    $('.mgu-api-quote-details').html(`
-                        <h4>Quote Details</h4>
-                        <p>Monthly Premium: £${response.data.monthly_premium}</p>
-                        <p>Annual Premium: £${response.data.annual_premium}</p>
-                    `);
+                    // Clear any error messages
                     $('.mgu-api-step-result').removeClass('error success').empty();
                 } else {
-                    $('.mgu-api-step-result').removeClass('success').addClass('error')
-                        .text(response.data || 'Failed to get quote');
+                    console.error('Quote error:', response.data);
+                    showError('step-device', 'Failed to get quote');
                 }
             },
             error: function(xhr, status, error) {
-                console.error('Quote error:', {xhr, status, error});
-                $('.mgu-api-step-result').removeClass('success').addClass('error')
-                    .text('Failed to get quote');
+                console.error('Quote request failed:', {xhr, status, error});
+                showError('step-device', 'Failed to get quote');
             }
         });
+    }
+
+    // Function to display quote
+    function displayQuote(quoteData) {
+        console.log('Displaying quote data:', quoteData);
+        
+        if (!quoteData || !quoteData.value || !Array.isArray(quoteData.value)) {
+            console.error('Invalid quote data received');
+            return;
+        }
+
+        // Store the options globally
+        quoteOptions = quoteData.value;
+        
+        // Create HTML for each option
+        const optionsHtml = quoteData.value.map(option => `
+            <div class="mgu-api-quote-option">
+                <h3>${option.make} ${option.model}</h3>
+                <div class="mgu-api-quote-details">
+                    <p>Memory: ${option.standardMemory} ${option.memorySize}</p>
+                    <p>Monthly Premium: £${option.monthlyPremium}</p>
+                    <p>Annual Premium: £${option.annualPremium}</p>
+                    <p>Damage Excess: £${option.damageExcess}</p>
+                    <p>Theft Excess: £${option.theftExcess}</p>
+                    ${option.lossCoverAvailable ? `
+                        <p>Loss Cover Available:</p>
+                        <p>Monthly: £${option.lossCoverMonthlyPremium}</p>
+                        <p>Annual: £${option.lossCoverAnnualPremium}</p>
+                    ` : ''}
+                    <button class="mgu-api-button select-quote-option" data-option-id="${option.id}">Select This Option</button>
+                </div>
+            </div>
+        `).join('');
+
+        const quoteHtml = `
+            <div class="mgu-api-quote-options">
+                ${optionsHtml}
+            </div>
+        `;
+        
+        $('.mgu-api-quote-details').html(quoteHtml);
+    }
+
+    // Handle quote option selection
+    $(document).on('click', '.select-quote-option', function(e) {
+        e.preventDefault();
+        const optionId = $(this).data('option-id');
+        const option = quoteOptions.find(opt => opt.id === optionId);
+        
+        if (option) {
+            // Store the selected option
+            selectedQuoteOption = option;
+            currentQuoteId = option.id;
+            
+            // Update UI
+            $('.mgu-api-quote-option').removeClass('selected');
+            $(this).closest('.mgu-api-quote-option').addClass('selected');
+            $('#accept-quote').show();
+            
+            console.log('Selected quote option:', selectedQuoteOption);
+            console.log('Current quote ID:', currentQuoteId);
+        }
     });
 
     // Handle quote acceptance
-    $('#accept-quote').on('click', function() {
-        $('#step-policy').show();
+    $('#accept-quote').on('click', function(e) {
+        e.preventDefault();
+        if (!selectedQuoteOption) {
+            console.error('No quote option selected');
+            return;
+        }
+        
+        // Show policy creation form
+        $('#policy-creation-form').show();
+        $(this).hide();
     });
 
     // Handle policy form submission
-    $('#policy-form').on('submit', function(e) {
+    $('#policy-creation-form').on('submit', function(e) {
         e.preventDefault();
+        console.log('Policy form submitted');
+        console.log('Current quote ID:', currentQuoteId);
+        console.log('Selected quote option:', selectedQuoteOption);
+
+        if (!currentQuoteId || !selectedQuoteOption) {
+            console.error('No quote selected');
+            return;
+        }
         
-        const policyData = {
-            first_name: $('#policy-first-name').val(),
-            last_name: $('#policy-last-name').val(),
+        // Debug form values
+        console.log('Form values:', {
+            firstName: $('#policy-first-name').val(),
+            lastName: $('#policy-last-name').val(),
             email: $('#policy-email').val(),
             phone: $('#policy-phone').val(),
-            device_data: {
-                manufacturer_id: $('#manufacturer-select').val(),
-                gadget_type: $('#gadget-type-select').val(),
-                model: $('#model-select').val(),
-                purchase_date: $('#device-purchase-date').val(),
-                purchase_price: $('#device-purchase-price').val()
-            }
+            address1: $('#policy-address1').val(),
+            postCode: $('#policy-postcode').val()
+        });
+        
+        const customerData = {
+            title: "Mr", // Default to Mr, could be made configurable
+            givenName: $('#policy-first-name').val(),
+            lastName: $('#policy-last-name').val(),
+            email: $('#policy-email').val(),
+            mobileNumber: $('#policy-phone').val(),
+            marketingOk: $('#policy-marketing').is(':checked'),
+            // Required address fields
+            address1: $('#policy-address1').val(),
+            postCode: $('#policy-postcode').val(),
+            // Optional fields
+            companyName: $('#policy-company').val() || "",
+            address2: $('#policy-address2').val() || "",
+            address3: $('#policy-address3').val() || "",
+            address4: $('#policy-address4').val() || "",
+            homePhone: $('#policy-home-phone').val() || "",
+            externalId: "" // Could be set to a unique identifier if needed
         };
 
-        console.log('Submitting policy data:', policyData);
+        console.log('Creating customer with data:', customerData);
+        console.log('Selected quote option:', selectedQuoteOption);
+        console.log('Current quote ID:', currentQuoteId);
+        console.log('Current gadget type:', currentGadgetType);
 
+        // First create the customer
         $.ajax({
             url: mgu_api.ajax_url,
             type: 'POST',
             data: {
-                action: 'mgu_api_create_policy',
-                policy_data: policyData,
+                action: 'mgu_api_create_customer',
+                customer_data: customerData,
                 nonce: mgu_api.nonce
             },
+            beforeSend: function() {
+                console.log('Sending customer creation request...');
+                showSuccess('step-policy', 'Creating customer...');
+            },
             success: function(response) {
-                console.log('Policy response:', response);
+                console.log('Customer creation response:', response);
                 if (response.success && response.data) {
-                    $('.mgu-api-step-result').removeClass('error').addClass('success')
-                        .text('Policy created successfully! Policy ID: ' + response.data.policy_id);
+                    // Store the customer ID for policy creation
+                    window.customerId = response.data.customerId;
+                    console.log('Customer created successfully. Customer ID:', window.customerId);
+                    
+                    // Now create the policy
+                    const policyData = {
+                        customer_id: window.customerId,
+                        quote_option_id: currentQuoteId,
+                        device_data: {
+                            manufacturer_id: $('#manufacturer-select').val(),
+                            gadget_type: $('#gadget-type-select').val(),
+                            model: $('#model-select').val(),
+                            purchase_date: $('#device-purchase-date').val(),
+                            purchase_price: $('#device-purchase-price').val()
+                        }
+                    };
+
+                    console.log('Creating policy with data:', policyData);
+
+                    $.ajax({
+                        url: mgu_api.ajax_url,
+                        type: 'POST',
+                        data: {
+                            action: 'mgu_api_create_policy',
+                            policy_data: policyData,
+                            nonce: mgu_api.nonce
+                        },
+                        beforeSend: function() {
+                            console.log('Sending policy creation request...');
+                            showSuccess('step-policy', 'Creating policy...');
+                        },
+                        success: function(policyResponse) {
+                            console.log('Policy creation response:', policyResponse);
+                            if (policyResponse.success && policyResponse.data) {
+                                showSuccess('step-policy', 'Policy created successfully! Policy ID: ' + policyResponse.data.policyId);
+                            } else {
+                                console.error('Policy creation failed:', policyResponse);
+                                showError('step-policy', policyResponse.data || 'Failed to create policy');
+                            }
+                        },
+                        error: function(xhr, status, error) {
+                            console.error('Policy creation error:', {xhr, status, error});
+                            showError('step-policy', 'Failed to create policy: ' + error);
+                        }
+                    });
                 } else {
-                    $('.mgu-api-step-result').removeClass('success').addClass('error')
-                        .text(response.data || 'Failed to create policy');
+                    console.error('Customer creation failed:', response);
+                    showError('step-policy', response.data || 'Failed to create customer');
                 }
             },
             error: function(xhr, status, error) {
-                console.error('Policy error:', {xhr, status, error});
-                $('.mgu-api-step-result').removeClass('success').addClass('error')
-                    .text('Failed to create policy');
+                console.error('Customer creation error:', {xhr, status, error});
+                showError('step-policy', 'Failed to create customer: ' + error);
             }
         });
     });

@@ -104,6 +104,39 @@ $api_client = new MGU_API_Client();
                     <label for="policy-phone">Phone</label>
                     <input type="tel" id="policy-phone" required>
                 </div>
+                <div class="form-group">
+                    <label for="policy-company">Company Name (Optional)</label>
+                    <input type="text" id="policy-company">
+                </div>
+                <div class="form-group">
+                    <label for="policy-address1">Address Line 1</label>
+                    <input type="text" id="policy-address1" required>
+                </div>
+                <div class="form-group">
+                    <label for="policy-address2">Address Line 2 (Optional)</label>
+                    <input type="text" id="policy-address2">
+                </div>
+                <div class="form-group">
+                    <label for="policy-address3">Address Line 3 (Optional)</label>
+                    <input type="text" id="policy-address3">
+                </div>
+                <div class="form-group">
+                    <label for="policy-address4">Address Line 4 (Optional)</label>
+                    <input type="text" id="policy-address4">
+                </div>
+                <div class="form-group">
+                    <label for="policy-postcode">Postcode</label>
+                    <input type="text" id="policy-postcode" required>
+                </div>
+                <div class="form-group">
+                    <label for="policy-home-phone">Home Phone (Optional)</label>
+                    <input type="tel" id="policy-home-phone">
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="policy-marketing"> I agree to receive marketing communications
+                    </label>
+                </div>
                 <button type="submit" class="mgu-api-button">Create Policy</button>
             </form>
             <div class="mgu-api-step-result"></div>
@@ -270,7 +303,16 @@ jQuery(document).ready(function($) {
             firstName: $('#policy-first-name').val(),
             lastName: $('#policy-last-name').val(),
             email: $('#policy-email').val(),
-            phone: $('#policy-phone').val()
+            phone: $('#policy-phone').val(),
+            company: $('#policy-company').val(),
+            address1: $('#policy-address1').val(),
+            address2: $('#policy-address2').val(),
+            address3: $('#policy-address3').val(),
+            address4: $('#policy-address4').val(),
+            postcode: $('#policy-postcode').val(),
+            homePhone: $('#policy-home-phone').val(),
+            marketing: $('#policy-marketing').is(':checked'),
+            marketingConsent: $('#policy-marketing').is(':checked') ? 'Yes' : 'No'
         };
         createPolicy(policyData);
     });
