@@ -300,8 +300,109 @@ jQuery(document).ready(function($) {
                     const successMessage = `Customer created successfully! Customer ID: ${customerId}`;
                     showSuccess('step-policy', successMessage);
                     
-                    // Stop here - no further processing
-                    console.log('DEBUG - Customer creation complete. Stopping process.');
+                    // Start policy creation process
+                    console.log('DEBUG - Starting policy creation process');
+                    
+                    // Open basket
+                    $.ajax({
+                        url: mgu_api.ajax_url,
+                        type: 'POST',
+                        data: {
+                            action: 'mgu_api_open_basket',
+                            customer_id: customerId,
+                            premium_period: window.selectedQuoteOption.annualPremium ? 'Annual' : 'Month',
+                            include_loss_cover: window.selectedQuoteOption.lossCoverAvailable ? 'Yes' : 'No',
+                            nonce: mgu_api.nonce
+                        },
+                        success: function(basketResponse) {
+                            console.log('DEBUG - Basket opened:', basketResponse);
+                            if (basketResponse.success && basketResponse.data && basketResponse.data.value) {
+                                const basketId = basketResponse.data.value;
+                                
+                                // Add gadget to basket
+                                $.ajax({
+                                    url: mgu_api.ajax_url,
+                                    type: 'POST',
+                                    data: {
+                                        action: 'mgu_api_add_gadget',
+                                        basket_id: basketId,
+                                        gadget_data: {
+                                            manufacturerId: window.selectedQuoteOption.manufacturerId,
+                                            gadgetType: window.selectedQuoteOption.gadgetType,
+                                            model: window.selectedQuoteOption.model,
+                                            memory: window.selectedQuoteOption.standardMemory,
+                                            memorySize: window.selectedQuoteOption.memorySize
+                                        },
+                                        nonce: mgu_api.nonce
+                                    },
+                                    success: function(addResponse) {
+                                        console.log('DEBUG - Gadget added:', addResponse);
+                                        if (addResponse.success) {
+                                            // Confirm basket
+                                            $.ajax({
+                                                url: mgu_api.ajax_url,
+                                                type: 'POST',
+                                                data: {
+                                                    action: 'mgu_api_confirm_basket',
+                                                    basket_id: basketId,
+                                                    nonce: mgu_api.nonce
+                                                },
+                                                success: function(confirmResponse) {
+                                                    console.log('DEBUG - Basket confirmed:', confirmResponse);
+                                                    if (confirmResponse.success) {
+                                                        // Create policy
+                                                        $.ajax({
+                                                            url: mgu_api.ajax_url,
+                                                            type: 'POST',
+                                                            data: {
+                                                                action: 'mgu_api_create_policy',
+                                                                policy_data: {
+                                                                    customerId: customerId,
+                                                                    basketId: basketId,
+                                                                    quoteOptionId: window.currentQuoteId
+                                                                },
+                                                                nonce: mgu_api.nonce
+                                                            },
+                                                            success: function(policyResponse) {
+                                                                console.log('DEBUG - Policy created:', policyResponse);
+                                                                if (policyResponse.success) {
+                                                                    showSuccess('step-policy', 'Policy created successfully!');
+                                                                } else {
+                                                                    showError('step-policy', 'Failed to create policy: ' + (policyResponse.data.message || 'Unknown error'));
+                                                                }
+                                                            },
+                                                            error: function(xhr, status, error) {
+                                                                console.error('DEBUG - Policy creation error:', {xhr, status, error});
+                                                                showError('step-policy', 'Error creating policy: ' + error);
+                                                            }
+                                                        });
+                                                    } else {
+                                                        showError('step-policy', 'Failed to confirm basket: ' + (confirmResponse.data.message || 'Unknown error'));
+                                                    }
+                                                },
+                                                error: function(xhr, status, error) {
+                                                    console.error('DEBUG - Basket confirmation error:', {xhr, status, error});
+                                                    showError('step-policy', 'Error confirming basket: ' + error);
+                                                }
+                                            });
+                                        } else {
+                                            showError('step-policy', 'Failed to add gadget: ' + (addResponse.data.message || 'Unknown error'));
+                                        }
+                                    },
+                                    error: function(xhr, status, error) {
+                                        console.error('DEBUG - Add gadget error:', {xhr, status, error});
+                                        showError('step-policy', 'Error adding gadget: ' + error);
+                                    }
+                                });
+                            } else {
+                                showError('step-policy', 'Failed to open basket: ' + (basketResponse.data.message || 'Unknown error'));
+                            }
+                        },
+                        error: function(xhr, status, error) {
+                            console.error('DEBUG - Open basket error:', {xhr, status, error});
+                            showError('step-policy', 'Error opening basket: ' + error);
+                        }
+                    });
                 } else {
                     console.error('DEBUG - Customer creation failed:', response);
                     showError('step-policy', response.data.message || 'Failed to create customer');

@@ -88,7 +88,6 @@ class MGU_API {
      * Register AJAX handlers
      */
     public function register_ajax_handlers() {
-        
         // Register AJAX actions for both logged-in and non-logged-in users
         add_action('wp_ajax_mgu_api_get_manufacturers', array($this, 'ajax_get_manufacturers'));
         add_action('wp_ajax_nopriv_mgu_api_get_manufacturers', array($this, 'ajax_get_manufacturers'));
@@ -101,6 +100,19 @@ class MGU_API {
         
         add_action('wp_ajax_mgu_api_create_customer', array($this, 'ajax_create_customer'));
         add_action('wp_ajax_nopriv_mgu_api_create_customer', array($this, 'ajax_create_customer'));
+
+        // Add new handlers for basket and policy operations
+        add_action('wp_ajax_mgu_api_open_basket', array($this, 'ajax_open_basket'));
+        add_action('wp_ajax_nopriv_mgu_api_open_basket', array($this, 'ajax_open_basket'));
+        
+        add_action('wp_ajax_mgu_api_add_gadget', array($this, 'ajax_add_gadget'));
+        add_action('wp_ajax_nopriv_mgu_api_add_gadget', array($this, 'ajax_add_gadget'));
+        
+        add_action('wp_ajax_mgu_api_confirm_basket', array($this, 'ajax_confirm_basket'));
+        add_action('wp_ajax_nopriv_mgu_api_confirm_basket', array($this, 'ajax_confirm_basket'));
+        
+        add_action('wp_ajax_mgu_api_create_policy', array($this, 'ajax_create_policy'));
+        add_action('wp_ajax_nopriv_mgu_api_create_policy', array($this, 'ajax_create_policy'));
     }
 
     /**
@@ -263,6 +275,161 @@ class MGU_API {
         
         error_log('Customer creation response: ' . print_r($response, true));
         error_log('=== End Customer Creation Debug ===');
+        wp_send_json_success($response);
+    }
+
+    /**
+     * AJAX handler for opening a basket
+     */
+    public function ajax_open_basket() {
+        error_log('=== Open Basket Debug ===');
+        error_log('AJAX request received for opening basket');
+        error_log('POST data: ' . print_r($_POST, true));
+        
+        // Verify nonce
+        if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'mgu_api_nonce')) {
+            error_log('Nonce verification failed for opening basket');
+            wp_send_json_error('Invalid security token');
+            return;
+        }
+        
+        $customer_id = isset($_POST['customer_id']) ? intval($_POST['customer_id']) : 0;
+        $premium_period = isset($_POST['premium_period']) ? sanitize_text_field($_POST['premium_period']) : '';
+        $include_loss_cover = isset($_POST['include_loss_cover']) ? sanitize_text_field($_POST['include_loss_cover']) : '';
+        
+        if (!$customer_id || !$premium_period || !$include_loss_cover) {
+            error_log('Missing required fields for opening basket');
+            wp_send_json_error('Missing required fields');
+            return;
+        }
+        
+        error_log('Opening basket for customer: ' . $customer_id);
+        $api_client = new MGU_API_Client();
+        $response = $api_client->open_basket($customer_id, $premium_period, $include_loss_cover);
+        
+        if (is_wp_error($response)) {
+            error_log('API Error: ' . $response->get_error_message());
+            wp_send_json_error($response->get_error_message());
+            return;
+        }
+        
+        error_log('Basket opened successfully: ' . print_r($response, true));
+        error_log('=== End Open Basket Debug ===');
+        wp_send_json_success($response);
+    }
+
+    /**
+     * AJAX handler for adding a gadget to the basket
+     */
+    public function ajax_add_gadget() {
+        error_log('=== Add Gadget Debug ===');
+        error_log('AJAX request received for adding gadget');
+        error_log('POST data: ' . print_r($_POST, true));
+        
+        // Verify nonce
+        if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'mgu_api_nonce')) {
+            error_log('Nonce verification failed for adding gadget');
+            wp_send_json_error('Invalid security token');
+            return;
+        }
+        
+        $basket_id = isset($_POST['basket_id']) ? intval($_POST['basket_id']) : 0;
+        $gadget_data = isset($_POST['gadget_data']) ? $_POST['gadget_data'] : array();
+        
+        if (!$basket_id || empty($gadget_data)) {
+            error_log('Missing required fields for adding gadget');
+            wp_send_json_error('Missing required fields');
+            return;
+        }
+        
+        error_log('Adding gadget to basket: ' . $basket_id);
+        $api_client = new MGU_API_Client();
+        $response = $api_client->add_gadgets($basket_id, array($gadget_data));
+        
+        if (is_wp_error($response)) {
+            error_log('API Error: ' . $response->get_error_message());
+            wp_send_json_error($response->get_error_message());
+            return;
+        }
+        
+        error_log('Gadget added successfully: ' . print_r($response, true));
+        error_log('=== End Add Gadget Debug ===');
+        wp_send_json_success($response);
+    }
+
+    /**
+     * AJAX handler for confirming the basket
+     */
+    public function ajax_confirm_basket() {
+        error_log('=== Confirm Basket Debug ===');
+        error_log('AJAX request received for confirming basket');
+        error_log('POST data: ' . print_r($_POST, true));
+        
+        // Verify nonce
+        if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'mgu_api_nonce')) {
+            error_log('Nonce verification failed for confirming basket');
+            wp_send_json_error('Invalid security token');
+            return;
+        }
+        
+        $basket_id = isset($_POST['basket_id']) ? intval($_POST['basket_id']) : 0;
+        
+        if (!$basket_id) {
+            error_log('Missing basket ID for confirmation');
+            wp_send_json_error('Missing basket ID');
+            return;
+        }
+        
+        error_log('Confirming basket: ' . $basket_id);
+        $api_client = new MGU_API_Client();
+        $response = $api_client->confirm_basket($basket_id);
+        
+        if (is_wp_error($response)) {
+            error_log('API Error: ' . $response->get_error_message());
+            wp_send_json_error($response->get_error_message());
+            return;
+        }
+        
+        error_log('Basket confirmed successfully: ' . print_r($response, true));
+        error_log('=== End Confirm Basket Debug ===');
+        wp_send_json_success($response);
+    }
+
+    /**
+     * AJAX handler for creating a policy
+     */
+    public function ajax_create_policy() {
+        error_log('=== Create Policy Debug ===');
+        error_log('AJAX request received for creating policy');
+        error_log('POST data: ' . print_r($_POST, true));
+        
+        // Verify nonce
+        if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'mgu_api_nonce')) {
+            error_log('Nonce verification failed for creating policy');
+            wp_send_json_error('Invalid security token');
+            return;
+        }
+        
+        $policy_data = isset($_POST['policy_data']) ? $_POST['policy_data'] : array();
+        
+        if (empty($policy_data)) {
+            error_log('No policy data provided');
+            wp_send_json_error('Policy data is required');
+            return;
+        }
+        
+        error_log('Creating policy with data: ' . print_r($policy_data, true));
+        $api_client = new MGU_API_Client();
+        $response = $api_client->create_policy($policy_data);
+        
+        if (is_wp_error($response)) {
+            error_log('API Error: ' . $response->get_error_message());
+            wp_send_json_error($response->get_error_message());
+            return;
+        }
+        
+        error_log('Policy created successfully: ' . print_r($response, true));
+        error_log('=== End Create Policy Debug ===');
         wp_send_json_success($response);
     }
 

@@ -254,7 +254,7 @@ class MGU_API_Client {
      * @return   array|WP_Error               The API response or WP_Error on failure.
      */
     public function open_basket($customer_id, $premium_period, $include_loss_cover) {
-        return $this->make_request('openBasket', 'GET', array(
+        return $this->make_request('/sbapi/v1/openBasket', 'GET', array(
             'customerId' => $customer_id,
             'premiumPeriod' => $premium_period,
             'includeLossCover' => $include_loss_cover
@@ -269,7 +269,7 @@ class MGU_API_Client {
      * @return   array|WP_Error         The API response or WP_Error on failure.
      */
     public function get_basket($basket_id) {
-        return $this->make_request('getBasket', 'GET', array('basketId' => $basket_id));
+        return $this->make_request('/sbapi/v1/getBasket', 'GET', array('basketId' => $basket_id));
     }
 
     /**
@@ -281,10 +281,11 @@ class MGU_API_Client {
      * @return   array|WP_Error          The API response or WP_Error on failure.
      */
     public function add_gadgets($basket_id, $gadgets) {
-        return $this->make_request('addGadgets', 'POST', array(
-            'basketId' => $basket_id,
-            'body' => $gadgets
-        ));
+        // Add basketId to each gadget
+        foreach ($gadgets as &$gadget) {
+            $gadget['basketId'] = $basket_id;
+        }
+        return $this->make_request('/sbapi/v1/addGadgets', 'POST', $gadgets);
     }
 
     /**
@@ -368,7 +369,7 @@ class MGU_API_Client {
      * @return   array|WP_Error         The API response or WP_Error on failure.
      */
     public function confirm_basket($basket_id) {
-        return $this->make_request('confirm', 'GET', array('basketId' => $basket_id));
+        return $this->make_request('/sbapi/v1/confirm', 'GET', array('basketId' => $basket_id));
     }
 
     /**
@@ -380,7 +381,7 @@ class MGU_API_Client {
      * @return   array|WP_Error         The API response or WP_Error on failure.
      */
     public function pay_by_direct_debit($basket_id, $direct_debit) {
-        return $this->make_request('payByDirectDebit', 'POST', array(
+        return $this->make_request('/sbapi/v1/payByDirectDebit', 'POST', array(
             'basketId' => $basket_id,
             'directDebit' => $direct_debit
         ));
@@ -414,6 +415,6 @@ class MGU_API_Client {
      * @return array|WP_Error
      */
     public function create_policy($policy_data) {
-        return $this->make_request('policies', 'POST', $policy_data);
+        return $this->make_request('/sbapi/v1/policies', 'POST', $policy_data);
     }
 } 
