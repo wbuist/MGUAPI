@@ -59,12 +59,19 @@ class MGU_API_Client {
      * @since    1.0.0
      */
     public function __construct() {
-        $raw_client_id = get_option('mgu_api_client_id');
-        $this->endpoint = get_option('mgu_api_endpoint', '');
-        $this->client_id = $raw_client_id;  // Use the raw value we already retrieved
-        $this->client_secret = get_option('mgu_api_client_secret', '');
+        $this->endpoint = get_option('mgu_api_endpoint');
+        $this->client_id = get_option('mgu_api_client_id');
+        $this->client_secret = get_option('mgu_api_client_secret');
         $this->access_token = '';
         $this->logger = new MGU_API_Logger();
+
+        error_log('MGU API Debug - Constructor values:');
+        error_log('MGU API Debug - endpoint from option: ' . get_option('mgu_api_endpoint'));
+        error_log('MGU API Debug - client_id from option: ' . get_option('mgu_api_client_id'));
+        error_log('MGU API Debug - client_secret from option: ' . substr(get_option('mgu_api_client_secret'), 0, 5) . '...');
+        error_log('MGU API Debug - endpoint property: ' . $this->endpoint);
+        error_log('MGU API Debug - client_id property: ' . $this->client_id);
+        error_log('MGU API Debug - client_secret property: ' . substr($this->client_secret, 0, 5) . '...');
     }
 
     /**
@@ -83,21 +90,16 @@ class MGU_API_Client {
      */
     private function refresh_token() {
         if (empty($this->endpoint) || empty($this->client_id) || empty($this->client_secret)) {
-            $this->logger->error('API configuration missing', array(
-                'has_endpoint' => !empty($this->endpoint),
-                'has_client_id' => !empty($this->client_id),
-                'has_client_secret' => !empty($this->client_secret)
-            ));
+            error_log('MGU API Debug - Token refresh failed: Missing configuration');
+            error_log('MGU API Debug - endpoint: ' . $this->endpoint);
+            error_log('MGU API Debug - client_id: ' . $this->client_id);
+            error_log('MGU API Debug - client_secret: ' . substr($this->client_secret, 0, 5) . '...');
             return false;
         }
 
         $auth_url = rtrim($this->endpoint, '/') . '/sbauth/oauth/token';
+        error_log('MGU API Debug - Token refresh URL: ' . $auth_url);
         
-        $this->logger->debug('Requesting new token', array(
-            'auth_url' => $auth_url,
-            'client_id' => $this->client_id
-        ));
-
         $response = wp_remote_post($auth_url, array(
             'headers' => array(
                 'accept' => 'application/json',
@@ -111,25 +113,23 @@ class MGU_API_Client {
         ));
 
         if (is_wp_error($response)) {
-            $this->logger->error('Token refresh failed: ' . $response->get_error_message());
+            error_log('MGU API Debug - Token refresh request failed: ' . $response->get_error_message());
             return false;
         }
 
         $body = wp_remote_retrieve_body($response);
         $data = json_decode($body, true);
+        error_log('MGU API Debug - Token refresh response: ' . $body);
 
         if (empty($data['access_token'])) {
-            $this->logger->error('Invalid token response', array('response' => $data));
+            error_log('MGU API Debug - Invalid token response: ' . print_r($data, true));
             return false;
         }
 
         $this->access_token = $data['access_token'];
         $this->token_expiry = time() + $data['expires_in'];
         
-        $this->logger->info('Token refreshed successfully', array(
-            'expires_in' => $data['expires_in']
-        ));
-
+        error_log('MGU API Debug - Token refresh successful, expires in: ' . $data['expires_in'] . ' seconds');
         return true;
     }
 
@@ -144,55 +144,67 @@ class MGU_API_Client {
      */
     private function make_request($endpoint, $method = 'GET', $data = array()) {
         if (empty($this->endpoint) || empty($this->client_id)) {
+            error_log('MGU API Debug - Configuration missing: endpoint=' . $this->endpoint . ', client_id=' . $this->client_id);
             return new WP_Error('config_error', 'API endpoint or key not configured');
         }
 
         $url = rtrim($this->endpoint, '/') . '/' . ltrim($endpoint, '/');
+        error_log('MGU API Debug - Request URL: ' . $url);
         
         // For GET requests, append the data as query parameters
         if ($method === 'GET' && !empty($data)) {
             $url = add_query_arg($data, $url);
+            error_log('MGU API Debug - GET parameters: ' . print_r($data, true));
         }
 
         // Get a valid token
         $token = $this->get_valid_token();
         if (!$token) {
+            error_log('MGU API Debug - Failed to get valid token');
             return new WP_Error('auth_error', 'Failed to obtain valid access token');
         }
+        error_log('MGU API Debug - Using token: ' . substr($token, 0, 20) . '...');
 
         $args = array(
             'method' => $method,
             'headers' => array(
-                'Authorization' => 'Bearer ' . $token,
+                'Authorization' => $token,
                 'Content-Type' => 'application/json',
                 'Accept' => 'application/json'
             )
         );
+        error_log('MGU API Debug - Request headers: ' . print_r($args['headers'], true));
 
         // Only add body for non-GET requests
         if ($method !== 'GET' && !empty($data)) {
             $args['body'] = json_encode($data);
+            error_log('MGU API Debug - Request body: ' . $args['body']);
         }
 
         $response = wp_remote_request($url, $args);
 
         if (is_wp_error($response)) {
+            error_log('MGU API Debug - Request error: ' . $response->get_error_message());
             return $response;
         }
 
         $response_code = wp_remote_retrieve_response_code($response);
         $body = wp_remote_retrieve_body($response);
         $data = json_decode($body, true);
+        
+        error_log('MGU API Debug - Response code: ' . $response_code);
+        error_log('MGU API Debug - Response body: ' . $body);
 
         // Handle token expiration
         if ($response_code === 401) {
-            $this->logger->error('Token expired, attempting refresh');
+            error_log('MGU API Debug - Token expired, attempting refresh');
             $this->access_token = null; // Force token refresh
             return $this->make_request($endpoint, $method, $data); // Retry the request
         }
 
         if ($response_code >= 400) {
             $error_message = isset($data['message']) ? $data['message'] : 'Unknown error';
+            error_log('MGU API Debug - API error: ' . $error_message);
             return new WP_Error('api_error', $error_message, $data);
         }
 

@@ -23,7 +23,7 @@ if (isset($_POST['mgu_api_test_action'])) {
 
     switch ($_POST['mgu_api_test_action']) {
         case 'test_connection':
-            $test_result = $api_client->get_manufacturers();
+            $test_result = $api_client->test_connection();
             break;
             
         case 'clear_logs':
