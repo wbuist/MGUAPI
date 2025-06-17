@@ -144,47 +144,47 @@ class MGU_API_Client {
      */
     private function make_request($endpoint, $method = 'GET', $data = array()) {
         if (empty($this->endpoint) || empty($this->client_id)) {
-            // error_log('MGU API Debug - Configuration missing: endpoint=' . $this->endpoint . ', client_id=' . $this->client_id);
+            error_log('MGU API Debug - Configuration missing: endpoint=' . $this->endpoint . ', client_id=' . $this->client_id);
             return new WP_Error('config_error', 'API endpoint or key not configured');
         }
 
         $url = rtrim($this->endpoint, '/') . '/' . ltrim($endpoint, '/');
-        // error_log('MGU API Debug - Request URL: ' . $url);
+        error_log('MGU API Debug - Request URL: ' . $url);
         
         // For GET requests, append the data as query parameters
         if ($method === 'GET' && !empty($data)) {
             $url = add_query_arg($data, $url);
-            // error_log('MGU API Debug - GET parameters: ' . print_r($data, true));
+            error_log('MGU API Debug - GET parameters: ' . print_r($data, true));
         }
 
         // Get a valid token
         $token = $this->get_valid_token();
         if (!$token) {
-            // error_log('MGU API Debug - Failed to get valid token');
+            error_log('MGU API Debug - Failed to get valid token');
             return new WP_Error('auth_error', 'Failed to obtain valid access token');
         }
-        // error_log('MGU API Debug - Using token: ' . substr($token, 0, 20) . '...');
+        error_log('MGU API Debug - Using token: ' . substr($token, 0, 20) . '...');
 
         $args = array(
             'method' => $method,
             'headers' => array(
-                'Authorization' => $token,
+                'Authorization' => 'Bearer ' . $token,
                 'Content-Type' => 'application/json',
                 'Accept' => 'application/json'
             )
         );
-        // error_log('MGU API Debug - Request headers: ' . print_r($args['headers'], true));
+        error_log('MGU API Debug - Request headers: ' . print_r($args['headers'], true));
 
         // Only add body for non-GET requests
         if ($method !== 'GET' && !empty($data)) {
             $args['body'] = json_encode($data);
-            // error_log('MGU API Debug - Request body: ' . $args['body']);
+            error_log('MGU API Debug - Request body: ' . $args['body']);
         }
 
         $response = wp_remote_request($url, $args);
 
         if (is_wp_error($response)) {
-            // error_log('MGU API Debug - Request error: ' . $response->get_error_message());
+            error_log('MGU API Debug - Request error: ' . $response->get_error_message());
             return $response;
         }
 
@@ -192,19 +192,19 @@ class MGU_API_Client {
         $body = wp_remote_retrieve_body($response);
         $data = json_decode($body, true);
         
-        // error_log('MGU API Debug - Response code: ' . $response_code);
-        // error_log('MGU API Debug - Response body: ' . $body);
+        error_log('MGU API Debug - Response code: ' . $response_code);
+        error_log('MGU API Debug - Response body: ' . $body);
 
         // Handle token expiration
         if ($response_code === 401) {
-            // error_log('MGU API Debug - Token expired, attempting refresh');
+            error_log('MGU API Debug - Token expired, attempting refresh');
             $this->access_token = null; // Force token refresh
             return $this->make_request($endpoint, $method, $data); // Retry the request
         }
 
         if ($response_code >= 400) {
             $error_message = isset($data['message']) ? $data['message'] : 'Unknown error';
-            // error_log('MGU API Debug - API error: ' . $error_message);
+            error_log('MGU API Debug - API error: ' . $error_message);
             return new WP_Error('api_error', $error_message, $data);
         }
 
@@ -219,7 +219,7 @@ class MGU_API_Client {
      * @return   array|WP_Error             The API response or WP_Error on failure.
      */
     public function create_customer($customer_data) {
-        return $this->make_request('newCustomer', 'POST', $customer_data);
+        return $this->make_request('/sbapi/v1/newCustomer', 'POST', $customer_data);
     }
 
     /**
