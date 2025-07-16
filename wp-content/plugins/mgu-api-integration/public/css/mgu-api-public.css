@@ -1,0 +1,167 @@
+.mgu-api-test-flow {
+    max-width: 800px;
+    margin: 2em auto;
+    padding: 20px;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    font-size: 16px;
+}
+
+.mgu-api-step {
+    margin-bottom: 2em;
+    padding: 20px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    position: relative;
+}
+
+.mgu-api-step h3 {
+    margin-top: 0;
+    color: #333;
+    font-size: 1.4em;
+    margin-bottom: 1em;
+}
+
+.mgu-api-select {
+    width: 100%;
+    padding: 12px;
+    margin-bottom: 1em;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 16px;
+    line-height: 1.4;
+    background-color: #fff;
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    background-size: 16px;
+    padding-right: 40px;
+}
+
+.mgu-api-select option {
+    padding: 12px;
+    font-size: 16px;
+    line-height: 1.4;
+}
+
+.mgu-api-form .form-group {
+    margin-bottom: 1.5em;
+}
+
+.mgu-api-form label {
+    display: block;
+    margin-bottom: 0.5em;
+    color: #333;
+    font-size: 1.1em;
+}
+
+.mgu-api-form input {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 16px;
+}
+
+.mgu-api-button {
+    background: #0073aa;
+    color: #fff;
+    padding: 12px 24px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: 500;
+}
+
+.mgu-api-button:hover {
+    background: #005177;
+}
+
+.mgu-api-step-result {
+    margin-top: 1em;
+    padding: 15px;
+    border-radius: 4px;
+    font-size: 16px;
+    position: absolute;
+    bottom: -60px;
+    left: 0;
+    right: 0;
+    z-index: 1;
+}
+
+.mgu-api-step-result.success {
+    background: #dff0d8;
+    color: #3c763d;
+    border: 1px solid #d6e9c6;
+}
+
+.mgu-api-step-result.error {
+    background: #f2dede;
+    color: #a94442;
+    border: 1px solid #ebccd1;
+}
+
+.mgu-api-quote-details {
+    margin: 1em 0;
+    padding: 15px;
+    background: #f9f9f9;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.mgu-api-quote-details h4 {
+    margin-top: 0;
+    color: #333;
+}
+
+.mgu-api-quote-details p {
+    margin: 0.5em 0;
+    color: #666;
+}
+
+.mgu-api-quote-options {
+    margin: 1em 0;
+}
+
+.mgu-api-quote-option {
+    margin-bottom: 1.5em;
+    padding: 1.5em;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: #fff;
+}
+
+.mgu-api-quote-option.selected {
+    border-color: #0073aa;
+    box-shadow: 0 0 5px rgba(0, 115, 170, 0.3);
+}
+
+.mgu-api-quote-option h4 {
+    margin-top: 0;
+    color: #333;
+    font-size: 1.2em;
+}
+
+.mgu-api-quote-option .mgu-api-quote-details {
+    margin-top: 1em;
+}
+
+.mgu-api-quote-option .mgu-api-quote-details p {
+    margin: 0.5em 0;
+    color: #666;
+}
+
+.mgu-api-quote-option .select-option {
+    margin-top: 1em;
+}
+
+#accept-quote {
+    display: none;
+    margin-top: 1em;
+} 
