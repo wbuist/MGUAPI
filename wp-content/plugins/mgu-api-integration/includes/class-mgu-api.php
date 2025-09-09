@@ -113,6 +113,9 @@ class MGU_API {
         
         add_action('wp_ajax_mgu_api_create_policy', array($this, 'ajax_create_policy'));
         add_action('wp_ajax_nopriv_mgu_api_create_policy', array($this, 'ajax_create_policy'));
+        
+        add_action('wp_ajax_mgu_api_pay_by_direct_debit', array($this, 'ajax_pay_by_direct_debit'));
+        add_action('wp_ajax_nopriv_mgu_api_pay_by_direct_debit', array($this, 'ajax_pay_by_direct_debit'));
     }
 
     /**
@@ -129,6 +132,13 @@ class MGU_API {
         $gadget_type = isset($_POST['gadget_type']) ? sanitize_text_field($_POST['gadget_type']) : '';
         if (empty($gadget_type)) {
             wp_send_json_error('Gadget type is required');
+            return;
+        }
+        
+        // Validate gadget type against allowed values from Swagger
+        $allowed_gadget_types = array('None', 'MobilePhone', 'Laptop', 'Tablet', 'VRHeadset', 'Watch', 'GamesConsole');
+        if (!in_array($gadget_type, $allowed_gadget_types)) {
+            wp_send_json_error('Invalid gadget type');
             return;
         }
         
@@ -155,16 +165,23 @@ class MGU_API {
             return;
         }
         
-        $manufacturer_id = isset($_POST['manufacturer_id']) ? sanitize_text_field($_POST['manufacturer_id']) : '';
+        $manufacturer_id = isset($_POST['manufacturer_id']) ? intval($_POST['manufacturer_id']) : 0;
         $gadget_type = isset($_POST['gadget_type']) ? sanitize_text_field($_POST['gadget_type']) : '';
         
-        if (empty($manufacturer_id)) {
-            wp_send_json_error('Manufacturer ID is required');
+        if (empty($manufacturer_id) || $manufacturer_id <= 0) {
+            wp_send_json_error('Valid manufacturer ID is required');
             return;
         }
         
         if (empty($gadget_type)) {
             wp_send_json_error('Gadget type is required');
+            return;
+        }
+        
+        // Validate gadget type against allowed values from Swagger
+        $allowed_gadget_types = array('None', 'MobilePhone', 'Laptop', 'Tablet', 'VRHeadset', 'Watch', 'GamesConsole');
+        if (!in_array($gadget_type, $allowed_gadget_types)) {
+            wp_send_json_error('Invalid gadget type');
             return;
         }
         
@@ -201,10 +218,23 @@ class MGU_API {
             return;
         }
 
-        // Validate required fields
+        // Validate required fields and types
         if (empty($device_data['ManufacturerID']) || empty($device_data['GadgetType']) || empty($device_data['Model'])) {
             error_log('Missing required fields in device data: ' . print_r($device_data, true));
             wp_send_json_error('Manufacturer ID, Gadget Type, and Model are required');
+            return;
+        }
+        
+        // Validate manufacturer ID is integer
+        if (!is_numeric($device_data['ManufacturerID']) || intval($device_data['ManufacturerID']) <= 0) {
+            wp_send_json_error('Manufacturer ID must be a valid positive integer');
+            return;
+        }
+        
+        // Validate gadget type
+        $allowed_gadget_types = array('None', 'MobilePhone', 'Laptop', 'Tablet', 'VRHeadset', 'Watch', 'GamesConsole');
+        if (!in_array($device_data['GadgetType'], $allowed_gadget_types)) {
+            wp_send_json_error('Invalid gadget type');
             return;
         }
         
@@ -253,12 +283,37 @@ class MGU_API {
             $customer_data['marketingOk'] = filter_var($customer_data['marketingOk'], FILTER_VALIDATE_BOOLEAN);
         }
 
-        // Validate required fields
+        // Validate required fields according to TGadgetCustomer specification
         $required_fields = array('givenName', 'lastName', 'email', 'mobileNumber', 'address1', 'postCode');
         foreach ($required_fields as $field) {
             if (empty($customer_data[$field])) {
                 error_log("Missing required field: {$field}");
                 wp_send_json_error("Missing required field: {$field}");
+                return;
+            }
+        }
+
+        // Validate field lengths according to Swagger specification
+        $field_lengths = array(
+            'title' => 4,
+            'givenName' => 25,
+            'lastName' => 30,
+            'companyName' => 250,
+            'address1' => 25,
+            'address2' => 25,
+            'address3' => 25,
+            'address4' => 25,
+            'postCode' => 9,
+            'email' => 75,
+            'mobileNumber' => 25,
+            'homePhone' => 25,
+            'externalId' => 75
+        );
+
+        foreach ($field_lengths as $field => $max_length) {
+            if (isset($customer_data[$field]) && strlen($customer_data[$field]) > $max_length) {
+                error_log("Field {$field} exceeds maximum length of {$max_length}");
+                wp_send_json_error("Field {$field} exceeds maximum length of {$max_length}");
                 return;
             }
         }
@@ -300,6 +355,20 @@ class MGU_API {
         if (!$customer_id || !$premium_period || !$include_loss_cover) {
             error_log('Missing required fields for opening basket');
             wp_send_json_error('Missing required fields');
+            return;
+        }
+        
+        // Validate premium period enum values
+        $allowed_premium_periods = array('Month', 'Annual');
+        if (!in_array($premium_period, $allowed_premium_periods)) {
+            wp_send_json_error('Premium period must be "Month" or "Annual"');
+            return;
+        }
+        
+        // Validate include loss cover enum values
+        $allowed_loss_cover = array('Yes', 'No');
+        if (!in_array($include_loss_cover, $allowed_loss_cover)) {
+            wp_send_json_error('Include loss cover must be "Yes" or "No"');
             return;
         }
         
@@ -430,6 +499,55 @@ class MGU_API {
         
         error_log('Policy created successfully: ' . print_r($response, true));
         error_log('=== End Create Policy Debug ===');
+        wp_send_json_success($response);
+    }
+
+    /**
+     * AJAX handler for payment by direct debit
+     */
+    public function ajax_pay_by_direct_debit() {
+        error_log('=== Pay By Direct Debit Debug ===');
+        error_log('AJAX request received for direct debit payment');
+        error_log('POST data: ' . print_r($_POST, true));
+        
+        // Verify nonce
+        if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'mgu_api_nonce')) {
+            error_log('Nonce verification failed for direct debit payment');
+            wp_send_json_error('Invalid security token');
+            return;
+        }
+        
+        $basket_id = isset($_POST['basket_id']) ? intval($_POST['basket_id']) : 0;
+        $direct_debit_data = isset($_POST['direct_debit_data']) ? $_POST['direct_debit_data'] : array();
+        
+        if (!$basket_id || empty($direct_debit_data)) {
+            error_log('Missing required fields for direct debit payment');
+            wp_send_json_error('Missing required fields');
+            return;
+        }
+        
+        // Validate direct debit data structure
+        $required_dd_fields = array('NameOnAccount', 'AccountNumber', 'SortCode');
+        foreach ($required_dd_fields as $field) {
+            if (empty($direct_debit_data[$field])) {
+                error_log("Missing required direct debit field: {$field}");
+                wp_send_json_error("Missing required field: {$field}");
+                return;
+            }
+        }
+        
+        error_log('Processing direct debit payment for basket: ' . $basket_id);
+        $api_client = new MGU_API_Client();
+        $response = $api_client->pay_by_direct_debit($basket_id, $direct_debit_data);
+        
+        if (is_wp_error($response)) {
+            error_log('Payment Error: ' . $response->get_error_message());
+            wp_send_json_error($response->get_error_message());
+            return;
+        }
+        
+        error_log('Payment processed successfully: ' . print_r($response, true));
+        error_log('=== End Pay By Direct Debit Debug ===');
         wp_send_json_success($response);
     }
 

@@ -89,8 +89,8 @@ jQuery(document).ready(function($) {
                     const select = $('#model-select');
                     select.empty().append('<option value="">Select a model...</option>');
                     
-                    models.forEach(function(modelName) {
-                        select.append(`<option value="${modelName}">${modelName}</option>`);
+                    models.forEach(function(model) {
+                        select.append(`<option value="${model.id}" data-model='${JSON.stringify(model)}'>${model.productName}</option>`);
                     });
                     
                     $('.mgu-api-step-result').removeClass('error success').empty();
@@ -110,6 +110,17 @@ jQuery(document).ready(function($) {
     // Handle model selection
     $('#model-select').on('change', function() {
         if ($(this).val()) {
+            // Store the selected model data
+            const selectedOption = $(this).find('option:selected');
+            console.log('Model selection changed - option data:', selectedOption.data('model'));
+            try {
+                window.selectedModel = JSON.parse(selectedOption.data('model'));
+                console.log('Selected model stored:', window.selectedModel);
+                console.log('Model product name:', window.selectedModel.productName);
+            } catch (e) {
+                console.error('Error parsing model data on selection:', e);
+                window.selectedModel = null;
+            }
             $('#step-device').show();
         }
     });
@@ -118,13 +129,34 @@ jQuery(document).ready(function($) {
     $('#device-form').on('submit', function(e) {
         e.preventDefault();
         
+        // Get model name - try multiple sources
+        let modelName = '';
+        if (window.selectedModel && window.selectedModel.productName) {
+            modelName = window.selectedModel.productName;
+        } else {
+            const selectedOption = $('#model-select').find('option:selected');
+            if (selectedOption.length && selectedOption.data('model')) {
+                try {
+                    const modelData = JSON.parse(selectedOption.data('model'));
+                    modelName = modelData.productName;
+                } catch (e) {
+                    console.error('Error parsing model data:', e);
+                    modelName = selectedOption.text(); // Fallback to option text
+                }
+            } else {
+                modelName = selectedOption.text(); // Final fallback
+            }
+        }
+
         const deviceData = {
-            ManufacturerID: $('#manufacturer-select').val(),
+            ManufacturerID: parseInt($('#manufacturer-select').val()),
             GadgetType: $('#gadget-type-select').val(),
-            Model: $('#model-select').val()
+            Model: modelName
         };
 
         console.log('Submitting device data:', deviceData);
+        console.log('Selected model object:', window.selectedModel);
+        console.log('Model select value:', $('#model-select').val());
 
         getQuote(deviceData);
     });
@@ -183,19 +215,20 @@ jQuery(document).ready(function($) {
         // Create HTML for each option
         const optionsHtml = quoteData.value.map(option => `
             <div class="mgu-api-quote-option">
-                <h3>${option.make} ${option.model}</h3>
+                <h3>${window.selectedModel ? window.selectedModel.productName : 'Device'} Quote</h3>
                 <div class="mgu-api-quote-details">
-                    <p>Memory: ${option.standardMemory} ${option.memorySize}</p>
-                    <p>Monthly Premium: £${option.monthlyPremium}</p>
-                    <p>Annual Premium: £${option.annualPremium}</p>
-                    <p>Damage Excess: £${option.damageExcess}</p>
-                    <p>Theft Excess: £${option.theftExcess}</p>
+                    <p>Memory: ${option.standardMemory || 'N/A'} ${option.memorySize || 'GB'}</p>
+                    <p>Monthly Premium: £${option.monthlyPremium || 'N/A'}</p>
+                    <p>Annual Premium: £${option.annualPremium || 'N/A'}</p>
+                    <p>Damage Excess: £${option.damageExcess || 'N/A'}</p>
+                    <p>Theft Excess: £${option.theftExcess || 'N/A'}</p>
+                    <p>Premium ID: ${option.premiumId || option.id || 'N/A'}</p>
                     ${option.lossCoverAvailable ? `
                         <p>Loss Cover Available:</p>
-                        <p>Monthly: £${option.lossCoverMonthlyPremium}</p>
-                        <p>Annual: £${option.lossCoverAnnualPremium}</p>
+                        <p>Monthly: £${option.lossCoverMonthlyPremium || 'N/A'}</p>
+                        <p>Annual: £${option.lossCoverAnnualPremium || 'N/A'}</p>
                     ` : ''}
-                    <button class="mgu-api-button select-quote-option" data-option-id="${option.id}">Select This Option</button>
+                    <button class="mgu-api-button select-quote-option" data-option-id="${option.premiumId || option.id}">Select This Option</button>
                 </div>
             </div>
         `).join('');
@@ -213,12 +246,12 @@ jQuery(document).ready(function($) {
     $(document).on('click', '.select-quote-option', function(e) {
         e.preventDefault();
         const optionId = $(this).data('option-id');
-        const option = window.quoteOptions.find(opt => opt.id === optionId);
+        const option = window.quoteOptions.find(opt => (opt.premiumId || opt.id) === optionId);
         
         if (option) {
             // Store the selected option
             window.selectedQuoteOption = option;
-            window.currentQuoteId = option.id;
+            window.currentQuoteId = option.premiumId || option.id;
             
             // Update UI
             $('.mgu-api-quote-option').removeClass('selected');
@@ -255,24 +288,22 @@ jQuery(document).ready(function($) {
             return;
         }
 
-        // Gather customer data
+        // Gather customer data - matching TGadgetCustomer structure from Swagger
         const customerData = {
-            title: "Mr", // Default to Mr, could be made configurable
-            givenName: $('#policy-first-name').val(),
-            lastName: $('#policy-last-name').val(),
-            email: $('#policy-email').val(),
-            mobileNumber: $('#policy-phone').val(),
-            marketingOk: Boolean($('#policy-marketing').is(':checked')),
-            // Required address fields
-            address1: $('#policy-address1').val(),
-            postCode: $('#policy-postcode').val(),
-            // Optional fields
-            companyName: $('#policy-company').val() || "",
-            address2: $('#policy-address2').val() || "",
-            address3: $('#policy-address3').val() || "",
-            address4: $('#policy-address4').val() || "",
-            homePhone: $('#policy-home-phone').val() || "",
-            externalId: "" // Could be set to a unique identifier if needed
+            title: "Mr", // maxLength: 4
+            givenName: $('#policy-first-name').val(), // REQUIRED, maxLength: 25
+            lastName: $('#policy-last-name').val(), // REQUIRED, maxLength: 30
+            companyName: $('#policy-company').val() || "", // maxLength: 250
+            address1: $('#policy-address1').val(), // REQUIRED, maxLength: 25
+            address2: $('#policy-address2').val() || "", // maxLength: 25
+            address3: $('#policy-address3').val() || "", // maxLength: 25
+            address4: $('#policy-address4').val() || "", // maxLength: 25
+            postCode: $('#policy-postcode').val(), // REQUIRED, maxLength: 9
+            email: $('#policy-email').val(), // REQUIRED, maxLength: 75
+            mobileNumber: $('#policy-phone').val(), // REQUIRED, maxLength: 25
+            homePhone: $('#policy-home-phone').val() || "", // maxLength: 25
+            marketingOk: Boolean($('#policy-marketing').is(':checked')), // boolean
+            externalId: "" // maxLength: 75 - could be set to a unique identifier if needed
         };
 
         console.log('DEBUG - Customer data being sent:', JSON.stringify(customerData, null, 2));
@@ -310,7 +341,7 @@ jQuery(document).ready(function($) {
                         data: {
                             action: 'mgu_api_open_basket',
                             customer_id: customerId,
-                            premium_period: window.selectedQuoteOption.annualPremium ? 'Annual' : 'Month',
+                            premium_period: (window.selectedQuoteOption.annualPremium && window.selectedQuoteOption.annualPremium > 0) ? 'Annual' : 'Month',
                             include_loss_cover: window.selectedQuoteOption.lossCoverAvailable ? 'Yes' : 'No',
                             nonce: mgu_api.nonce
                         },
@@ -327,11 +358,15 @@ jQuery(document).ready(function($) {
                                         action: 'mgu_api_add_gadget',
                                         basket_id: basketId,
                                         gadget_data: {
-                                            manufacturerId: window.selectedQuoteOption.manufacturerId,
-                                            gadgetType: window.selectedQuoteOption.gadgetType,
-                                            model: window.selectedQuoteOption.model,
-                                            memory: window.selectedQuoteOption.standardMemory,
-                                            memorySize: window.selectedQuoteOption.memorySize
+                                            premiumId: parseInt(window.currentQuoteId), // REQUIRED - from quote response, must be integer
+                                            status: "New", // enum: Unknown, Deleted, NotActive, New, Saved, Active, Cancelled, Completed
+                                            gadgetType: window.selectedQuoteOption.gadgetType, // enum
+                                            make: window.selectedQuoteOption.make, // string
+                                            model: window.selectedQuoteOption.model, // string
+                                            dateOfPurchase: $('#device-purchase-date').val() || new Date().toISOString().split('T')[0], // date format
+                                            serialNumber: "", // string - could be collected from user
+                                            installedMemory: window.selectedQuoteOption.standardMemory + window.selectedQuoteOption.memorySize, // string
+                                            purchasePrice: parseFloat($('#device-purchase-price').val()) || 0 // number
                                         },
                                         nonce: mgu_api.nonce
                                     },
@@ -349,33 +384,21 @@ jQuery(document).ready(function($) {
                                                 },
                                                 success: function(confirmResponse) {
                                                     console.log('DEBUG - Basket confirmed:', confirmResponse);
-                                                    if (confirmResponse.success) {
-                                                        // Create policy
-                                                        $.ajax({
-                                                            url: mgu_api.ajax_url,
-                                                            type: 'POST',
-                                                            data: {
-                                                                action: 'mgu_api_create_policy',
-                                                                policy_data: {
-                                                                    customerId: customerId,
-                                                                    basketId: basketId,
-                                                                    quoteOptionId: window.currentQuoteId
-                                                                },
-                                                                nonce: mgu_api.nonce
-                                                            },
-                                                            success: function(policyResponse) {
-                                                                console.log('DEBUG - Policy created:', policyResponse);
-                                                                if (policyResponse.success) {
-                                                                    showSuccess('step-policy', 'Policy created successfully!');
-                                                                } else {
-                                                                    showError('step-policy', 'Failed to create policy: ' + (policyResponse.data.message || 'Unknown error'));
-                                                                }
-                                                            },
-                                                            error: function(xhr, status, error) {
-                                                                console.error('DEBUG - Policy creation error:', {xhr, status, error});
-                                                                showError('step-policy', 'Error creating policy: ' + error);
-                                                            }
-                                                        });
+                                                    if (confirmResponse.success && confirmResponse.data && confirmResponse.data.value) {
+                                                        const paymentResponse = confirmResponse.data.value;
+                                                        console.log('DEBUG - Payment response:', paymentResponse);
+                                                        
+                                                        // Check if payment is required
+                                                        if (paymentResponse.Outcome === 'PaymentRequired') {
+                                                            console.log('DEBUG - Payment required, showing payment form');
+                                                            showPaymentForm(basketId);
+                                                        } else if (paymentResponse.Outcome === 'Confirmed') {
+                                                            console.log('DEBUG - Policy confirmed without payment');
+                                                            showSuccess('step-policy', 'Policy created and confirmed successfully!');
+                                                        } else {
+                                                            console.error('DEBUG - Unexpected payment outcome:', paymentResponse.Outcome);
+                                                            showError('step-policy', 'Unexpected payment outcome: ' + paymentResponse.OutcomeText);
+                                                        }
                                                     } else {
                                                         showError('step-policy', 'Failed to confirm basket: ' + (confirmResponse.data.message || 'Unknown error'));
                                                     }
@@ -431,5 +454,68 @@ jQuery(document).ready(function($) {
             .removeClass('error')
             .addClass('success')
             .html(`<div class="success-message">${message}</div>`);
+    }
+
+    // Function to show payment form
+    function showPaymentForm(basketId) {
+        const paymentFormHtml = `
+            <div class="mgu-api-payment-form">
+                <h4>Payment Required</h4>
+                <p>Please provide your bank account details for direct debit payment:</p>
+                <form id="payment-form">
+                    <div class="form-group">
+                        <label for="payment-name-on-account">Name on Account</label>
+                        <input type="text" id="payment-name-on-account" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="payment-account-number">Account Number</label>
+                        <input type="text" id="payment-account-number" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="payment-sort-code">Sort Code</label>
+                        <input type="text" id="payment-sort-code" required placeholder="12-34-56">
+                    </div>
+                    <button type="submit" class="mgu-api-button">Process Payment</button>
+                </form>
+            </div>
+        `;
+        
+        $('.mgu-api-step-result').html(paymentFormHtml);
+        
+        // Handle payment form submission
+        $('#payment-form').on('submit', function(e) {
+            e.preventDefault();
+            
+            const directDebitData = {
+                NameOnAccount: $('#payment-name-on-account').val(),
+                AccountNumber: $('#payment-account-number').val(),
+                SortCode: $('#payment-sort-code').val()
+            };
+            
+            console.log('DEBUG - Processing direct debit payment:', directDebitData);
+            
+            $.ajax({
+                url: mgu_api.ajax_url,
+                type: 'POST',
+                data: {
+                    action: 'mgu_api_pay_by_direct_debit',
+                    basket_id: basketId,
+                    direct_debit_data: directDebitData,
+                    nonce: mgu_api.nonce
+                },
+                success: function(paymentResponse) {
+                    console.log('DEBUG - Payment response:', paymentResponse);
+                    if (paymentResponse.success) {
+                        showSuccess('step-policy', 'Payment processed successfully! Policy created and confirmed.');
+                    } else {
+                        showError('step-policy', 'Payment failed: ' + (paymentResponse.data.message || 'Unknown error'));
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('DEBUG - Payment error:', {xhr, status, error});
+                    showError('step-policy', 'Error processing payment: ' + error);
+                }
+            });
+        });
     }
 }); 

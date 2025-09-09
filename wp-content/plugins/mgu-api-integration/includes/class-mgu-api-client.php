@@ -140,9 +140,10 @@ class MGU_API_Client {
      * @param    string    $endpoint    The API endpoint to call.
      * @param    string    $method      The HTTP method to use.
      * @param    array     $data        The data to send with the request.
+     * @param    array     $query_params Query parameters for the request.
      * @return   array|WP_Error        The API response or WP_Error on failure.
      */
-    private function make_request($endpoint, $method = 'GET', $data = array()) {
+    private function make_request($endpoint, $method = 'GET', $data = array(), $query_params = array()) {
         if (empty($this->endpoint) || empty($this->client_id)) {
             error_log('MGU API Debug - Configuration missing: endpoint=' . $this->endpoint . ', client_id=' . $this->client_id);
             return new WP_Error('config_error', 'API endpoint or key not configured');
@@ -155,6 +156,12 @@ class MGU_API_Client {
         if ($method === 'GET' && !empty($data)) {
             $url = add_query_arg($data, $url);
             error_log('MGU API Debug - GET parameters: ' . print_r($data, true));
+        }
+        
+        // For POST requests with query parameters (like addGadgets)
+        if ($method === 'POST' && !empty($query_params)) {
+            $url = add_query_arg($query_params, $url);
+            error_log('MGU API Debug - POST query parameters: ' . print_r($query_params, true));
         }
 
         // Get a valid token
@@ -281,11 +288,8 @@ class MGU_API_Client {
      * @return   array|WP_Error          The API response or WP_Error on failure.
      */
     public function add_gadgets($basket_id, $gadgets) {
-        // Add basketId to each gadget
-        foreach ($gadgets as &$gadget) {
-            $gadget['basketId'] = $basket_id;
-        }
-        return $this->make_request('/sbapi/v1/addGadgets', 'POST', $gadgets);
+        // According to Swagger, basketId should be a query parameter, not in the body
+        return $this->make_request('/sbapi/v1/addGadgets', 'POST', $gadgets, array('basketId' => $basket_id));
     }
 
     /**
@@ -295,7 +299,7 @@ class MGU_API_Client {
      * @return array|WP_Error Array of manufacturers or WP_Error on failure
      */
     public function get_manufacturers($gadget_type) {
-        return $this->make_request('/sbapi/v1/manufacturers', 'GET',  array(
+        return $this->make_request('/sbapi/v1/manufacturersByGadget', 'GET',  array(
             'GadgetType' => $gadget_type
         ));
     }
@@ -417,4 +421,5 @@ class MGU_API_Client {
     public function create_policy($policy_data) {
         return $this->make_request('/sbapi/v1/policies', 'POST', $policy_data);
     }
+
 } 
