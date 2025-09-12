@@ -114,7 +114,8 @@ jQuery(document).ready(function($) {
             const selectedOption = $(this).find('option:selected');
             console.log('Model selection changed - option data:', selectedOption.data('model'));
             try {
-                window.selectedModel = JSON.parse(selectedOption.data('model'));
+                const modelData = selectedOption.data('model');
+                window.selectedModel = (typeof modelData === 'string') ? JSON.parse(modelData) : modelData;
                 console.log('Selected model stored:', window.selectedModel);
                 console.log('Model product name:', window.selectedModel.productName);
             } catch (e) {
@@ -306,18 +307,27 @@ jQuery(document).ready(function($) {
             externalId: "" // maxLength: 75 - could be set to a unique identifier if needed
         };
 
+        // Gather payment data - matching TDirectDebit structure from Swagger
+        const paymentData = {
+            NameOnAccount: $('#payment-name-on-account').val(),
+            AccountNumber: $('#payment-account-number').val(),
+            SortCode: $('#payment-sort-code').val()
+        };
+
         console.log('DEBUG - Customer data being sent:', JSON.stringify(customerData, null, 2));
+        console.log('DEBUG - Payment data being sent:', JSON.stringify(paymentData, null, 2));
         console.log('DEBUG - Selected quote option:', JSON.stringify(window.selectedQuoteOption, null, 2));
         console.log('DEBUG - Current quote ID:', window.currentQuoteId);
         console.log('DEBUG - Current gadget type:', window.currentGadgetType);
 
-        // Create the customer
+        // Create the customer with payment details
         $.ajax({
             url: mgu_api.ajax_url,
             type: 'POST',
             data: {
                 action: 'mgu_api_create_customer',
                 customer_data: customerData,
+                payment_data: paymentData,
                 nonce: mgu_api.nonce
             },
             success: function(response) {
@@ -351,23 +361,27 @@ jQuery(document).ready(function($) {
                                 const basketId = basketResponse.data.value;
                                 
                                 // Add gadget to basket
+                                const gadgetData = {
+                                    premiumId: parseInt(window.currentQuoteId), // REQUIRED - from quote response, must be integer
+                                    status: "New", // enum: Unknown, Deleted, NotActive, New, Saved, Active, Cancelled, Completed
+                                    gadgetType: window.selectedQuoteOption.gadgetType, // enum
+                                    make: window.selectedQuoteOption.make, // string
+                                    model: window.selectedQuoteOption.model, // string
+                                    dateOfPurchase: $('#device-purchase-date').val() || new Date().toISOString().split('T')[0], // date format
+                                    serialNumber: "", // string - could be collected from user
+                                    installedMemory: (window.selectedQuoteOption.standardMemory || '') + (window.selectedQuoteOption.memorySize || ''), // string
+                                    purchasePrice: parseFloat($('#device-purchase-price').val()) || 0 // number
+                                };
+                                
+                                console.log('DEBUG - Gadget data being sent:', JSON.stringify(gadgetData, null, 2));
+                                
                                 $.ajax({
                                     url: mgu_api.ajax_url,
                                     type: 'POST',
                                     data: {
                                         action: 'mgu_api_add_gadget',
                                         basket_id: basketId,
-                                        gadget_data: {
-                                            premiumId: parseInt(window.currentQuoteId), // REQUIRED - from quote response, must be integer
-                                            status: "New", // enum: Unknown, Deleted, NotActive, New, Saved, Active, Cancelled, Completed
-                                            gadgetType: window.selectedQuoteOption.gadgetType, // enum
-                                            make: window.selectedQuoteOption.make, // string
-                                            model: window.selectedQuoteOption.model, // string
-                                            dateOfPurchase: $('#device-purchase-date').val() || new Date().toISOString().split('T')[0], // date format
-                                            serialNumber: "", // string - could be collected from user
-                                            installedMemory: window.selectedQuoteOption.standardMemory + window.selectedQuoteOption.memorySize, // string
-                                            purchasePrice: parseFloat($('#device-purchase-price').val()) || 0 // number
-                                        },
+                                        gadget_data: gadgetData,
                                         nonce: mgu_api.nonce
                                     },
                                     success: function(addResponse) {
@@ -380,6 +394,7 @@ jQuery(document).ready(function($) {
                                                 data: {
                                                     action: 'mgu_api_confirm_basket',
                                                     basket_id: basketId,
+                                                    customer_id: customerId,
                                                     nonce: mgu_api.nonce
                                                 },
                                                 success: function(confirmResponse) {
@@ -389,13 +404,13 @@ jQuery(document).ready(function($) {
                                                         const paymentResponse = confirmResponse.data;
                                                         console.log('DEBUG - Payment response:', paymentResponse);
                                                         
-                                                        // Check if payment is required
-                                                        if (paymentResponse.Outcome === 'PaymentRequired') {
-                                                            console.log('DEBUG - Payment required, showing payment form');
-                                                            showPaymentForm(basketId);
-                                                        } else if (paymentResponse.Outcome === 'Confirmed') {
-                                                            console.log('DEBUG - Policy confirmed without payment');
-                                                            showSuccess('step-policy', 'Policy created and confirmed successfully!');
+                                                        // Check the outcome
+                                                        if (paymentResponse.Outcome === 'Confirmed') {
+                                                            console.log('DEBUG - Policy created and payment processed successfully');
+                                                            showSuccess('step-policy', 'Policy created and payment processed successfully!');
+                                                        } else if (paymentResponse.Outcome === 'PaymentRequired') {
+                                                            console.log('DEBUG - Payment still required (this shouldn\'t happen with new flow)');
+                                                            showError('step-policy', 'Payment processing failed. Please try again.');
                                                         } else {
                                                             console.error('DEBUG - Unexpected payment outcome:', paymentResponse.Outcome);
                                                             showError('step-policy', 'Unexpected payment outcome: ' + paymentResponse.OutcomeText);
@@ -457,68 +472,4 @@ jQuery(document).ready(function($) {
             .html(`<div class="success-message">${message}</div>`);
     }
 
-    // Function to show payment form
-    function showPaymentForm(basketId) {
-        const paymentFormHtml = `
-            <div class="mgu-api-payment-form">
-                <h4>Payment Required</h4>
-                <p>Please provide your bank account details for direct debit payment:</p>
-                <form id="payment-form">
-                    <div class="form-group">
-                        <label for="payment-name-on-account">Name on Account</label>
-                        <input type="text" id="payment-name-on-account" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="payment-account-number">Account Number</label>
-                        <input type="text" id="payment-account-number" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="payment-sort-code">Sort Code</label>
-                        <input type="text" id="payment-sort-code" required placeholder="12-34-56">
-                    </div>
-                    <button type="submit" class="mgu-api-button">Process Payment</button>
-                </form>
-            </div>
-        `;
-        
-        $('.mgu-api-step-result').html(paymentFormHtml);
-        
-        // Handle payment form submission
-        $('#payment-form').on('submit', function(e) {
-            e.preventDefault();
-            console.log('DEBUG - Payment form submitted');
-            
-            const directDebitData = {
-                NameOnAccount: $('#payment-name-on-account').val(),
-                AccountNumber: $('#payment-account-number').val(),
-                SortCode: $('#payment-sort-code').val()
-            };
-            
-            console.log('DEBUG - Processing direct debit payment:', directDebitData);
-            console.log('DEBUG - Basket ID:', basketId);
-            
-            $.ajax({
-                url: mgu_api.ajax_url,
-                type: 'POST',
-                data: {
-                    action: 'mgu_api_pay_by_direct_debit',
-                    basket_id: basketId,
-                    direct_debit_data: directDebitData,
-                    nonce: mgu_api.nonce
-                },
-                success: function(paymentResponse) {
-                    console.log('DEBUG - Payment response:', paymentResponse);
-                    if (paymentResponse.success) {
-                        showSuccess('step-policy', 'Payment processed successfully! Policy created and confirmed.');
-                    } else {
-                        showError('step-policy', 'Payment failed: ' + (paymentResponse.data.message || 'Unknown error'));
-                    }
-                },
-                error: function(xhr, status, error) {
-                    console.error('DEBUG - Payment error:', {xhr, status, error});
-                    showError('step-policy', 'Error processing payment: ' + error);
-                }
-            });
-        });
-    }
 }); 

@@ -272,15 +272,33 @@ class MGU_API {
         }
         
         $customer_data = isset($_POST['customer_data']) ? $_POST['customer_data'] : array();
+        $payment_data = isset($_POST['payment_data']) ? $_POST['payment_data'] : array();
+        
         if (empty($customer_data)) {
             error_log('No customer data provided');
             wp_send_json_error('Customer data is required');
+            return;
+        }
+        
+        if (empty($payment_data)) {
+            error_log('No payment data provided');
+            wp_send_json_error('Payment data is required');
             return;
         }
 
         // Convert marketingOk to boolean
         if (isset($customer_data['marketingOk'])) {
             $customer_data['marketingOk'] = filter_var($customer_data['marketingOk'], FILTER_VALIDATE_BOOLEAN);
+        }
+
+        // Validate payment data
+        $required_payment_fields = array('NameOnAccount', 'AccountNumber', 'SortCode');
+        foreach ($required_payment_fields as $field) {
+            if (empty($payment_data[$field])) {
+                error_log("Missing required payment field: {$field}");
+                wp_send_json_error("Missing required payment field: {$field}");
+                return;
+            }
         }
 
         // Validate required fields according to TGadgetCustomer specification
@@ -326,6 +344,14 @@ class MGU_API {
             error_log('API Error: ' . $response->get_error_message());
             wp_send_json_error($response->get_error_message());
             return;
+        }
+        
+        // Store payment data for later use (when basket is confirmed)
+        if (isset($response['value']) && is_numeric($response['value'])) {
+            $customer_id = $response['value'];
+            // Store payment data in WordPress transients (temporary storage)
+            set_transient('mgu_payment_data_' . $customer_id, $payment_data, 3600); // Expires in 1 hour
+            error_log('Payment data stored for customer ID: ' . $customer_id);
         }
         
         error_log('Customer creation response: ' . print_r($response, true));
@@ -470,6 +496,44 @@ class MGU_API {
         }
         
         error_log('Basket confirmed successfully: ' . print_r($response, true));
+        
+        // If payment is required, automatically process it with stored payment data
+        if (isset($response['Outcome']) && $response['Outcome'] === 'PaymentRequired') {
+            error_log('Payment required, processing with stored payment data');
+            
+            // Get customer ID from basket (we need to find a way to get this)
+            // For now, we'll need to pass the customer ID in the request
+            $customer_id = isset($_POST['customer_id']) ? intval($_POST['customer_id']) : 0;
+            
+            if ($customer_id) {
+                // Retrieve stored payment data
+                $payment_data = get_transient('mgu_payment_data_' . $customer_id);
+                
+                if ($payment_data) {
+                    error_log('Found stored payment data for customer: ' . $customer_id);
+                    
+                    // Process direct debit payment
+                    $payment_response = $api_client->pay_by_direct_debit($basket_id, $payment_data);
+                    
+                    if (is_wp_error($payment_response)) {
+                        error_log('Payment processing error: ' . $payment_response->get_error_message());
+                        // Don't fail the entire process, just log the error
+                    } else {
+                        error_log('Payment processed successfully: ' . print_r($payment_response, true));
+                        // Update the response with payment result
+                        $response = $payment_response;
+                        
+                        // Clean up stored payment data
+                        delete_transient('mgu_payment_data_' . $customer_id);
+                    }
+                } else {
+                    error_log('No stored payment data found for customer: ' . $customer_id);
+                }
+            } else {
+                error_log('No customer ID provided for payment processing');
+            }
+        }
+        
         error_log('=== End Confirm Basket Debug ===');
         wp_send_json_success($response);
     }

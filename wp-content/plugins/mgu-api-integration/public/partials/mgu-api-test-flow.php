@@ -137,6 +137,22 @@ $api_client = new MGU_API_Client();
                         <input type="checkbox" id="policy-marketing"> I agree to receive marketing communications
                     </label>
                 </div>
+                
+                <!-- Payment Details Section -->
+                <h4>Payment Details (Direct Debit)</h4>
+                <div class="form-group">
+                    <label for="payment-name-on-account">Name on Account</label>
+                    <input type="text" id="payment-name-on-account" required>
+                </div>
+                <div class="form-group">
+                    <label for="payment-sort-code">Sort Code</label>
+                    <input type="text" id="payment-sort-code" placeholder="12-34-56" required>
+                </div>
+                <div class="form-group">
+                    <label for="payment-account-number">Account Number</label>
+                    <input type="text" id="payment-account-number" required>
+                </div>
+                
                 <button type="submit" class="mgu-api-button">Create Policy</button>
             </form>
             <div class="mgu-api-step-result"></div>
