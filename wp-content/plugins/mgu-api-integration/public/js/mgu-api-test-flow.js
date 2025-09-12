@@ -384,8 +384,9 @@ jQuery(document).ready(function($) {
                                                 },
                                                 success: function(confirmResponse) {
                                                     console.log('DEBUG - Basket confirmed:', confirmResponse);
-                                                    if (confirmResponse.success && confirmResponse.data && confirmResponse.data.value) {
-                                                        const paymentResponse = confirmResponse.data.value;
+                                                    console.log('DEBUG - Full basket confirmation response:', JSON.stringify(confirmResponse, null, 2));
+                                                    if (confirmResponse.success && confirmResponse.data) {
+                                                        const paymentResponse = confirmResponse.data;
                                                         console.log('DEBUG - Payment response:', paymentResponse);
                                                         
                                                         // Check if payment is required
@@ -442,11 +443,11 @@ jQuery(document).ready(function($) {
         });
     });
 
-    function showError(message) {
-        $('#error-message').text(message).show();
-        setTimeout(function() {
-            $('#error-message').fadeOut();
-        }, 5000);
+    function showError(stepId, message) {
+        $(`#${stepId} .mgu-api-step-result`)
+            .removeClass('success')
+            .addClass('error')
+            .html(`<div class="error-message">${message}</div>`);
     }
 
     function showSuccess(stepId, message) {
@@ -485,6 +486,7 @@ jQuery(document).ready(function($) {
         // Handle payment form submission
         $('#payment-form').on('submit', function(e) {
             e.preventDefault();
+            console.log('DEBUG - Payment form submitted');
             
             const directDebitData = {
                 NameOnAccount: $('#payment-name-on-account').val(),
@@ -493,6 +495,7 @@ jQuery(document).ready(function($) {
             };
             
             console.log('DEBUG - Processing direct debit payment:', directDebitData);
+            console.log('DEBUG - Basket ID:', basketId);
             
             $.ajax({
                 url: mgu_api.ajax_url,

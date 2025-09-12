@@ -411,6 +411,16 @@ class MGU_API {
             return;
         }
         
+        // Ensure premiumId is an integer (required by API)
+        if (isset($gadget_data['premiumId'])) {
+            $gadget_data['premiumId'] = intval($gadget_data['premiumId']);
+        }
+        
+        // Ensure purchasePrice is a number (required by API)
+        if (isset($gadget_data['purchasePrice'])) {
+            $gadget_data['purchasePrice'] = floatval($gadget_data['purchasePrice']);
+        }
+        
         error_log('Adding gadget to basket: ' . $basket_id);
         $api_client = new MGU_API_Client();
         $response = $api_client->add_gadgets($basket_id, array($gadget_data));
