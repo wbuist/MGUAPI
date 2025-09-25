@@ -73,6 +73,11 @@ register_deactivation_hook(__FILE__, 'deactivate_mgu_api_integration');
 function run_mgu_api_integration() {
     error_log('MGU API Integration plugin running');
     $plugin = new MGU_API();
+    
+    // Make the plugin instance globally accessible
+    global $mgu_api_plugin;
+    $mgu_api_plugin = $plugin;
+    
     $plugin->run();
 }
 
