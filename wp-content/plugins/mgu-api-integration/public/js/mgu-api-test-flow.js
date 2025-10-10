@@ -10,6 +10,25 @@ jQuery(document).ready(function($) {
     window.quoteOptions = [];
     let selectedModelData = null;
 
+    // Loading state helper functions
+    function showLoading(stepId) {
+        $('#' + stepId).addClass('loading');
+        $('#' + stepId + ' select, #' + stepId + ' input, #' + stepId + ' button').prop('disabled', true);
+    }
+
+    function hideLoading(stepId) {
+        $('#' + stepId).removeClass('loading');
+        $('#' + stepId + ' select, #' + stepId + ' input, #' + stepId + ' button').prop('disabled', false);
+    }
+
+    function showButtonLoading(buttonId) {
+        $('#' + buttonId).addClass('loading').prop('disabled', true);
+    }
+
+    function hideButtonLoading(buttonId) {
+        $('#' + buttonId).removeClass('loading').prop('disabled', false);
+    }
+
     // Handle gadget type selection
     $('#gadget-type-select').on('change', function() {
         const gadgetType = $(this).val();
@@ -31,12 +50,16 @@ jQuery(document).ready(function($) {
         // Clear any existing error messages
         $('#step-manufacturer .mgu-api-step-result').removeClass('error success').empty();
         
+        // Show loading state
+        showLoading('step-manufacturer');
+        
         // Load manufacturers
         $.ajax({
             url: mgu_api.ajax_url,
             type: 'POST',
             data: requestData,
             success: function(response) {
+                hideLoading('step-manufacturer');
                 console.log('Manufacturers response:', response);
                 console.log('Response success:', response.success);
                 console.log('Response data:', response.data);
@@ -85,6 +108,7 @@ jQuery(document).ready(function($) {
                 }
             },
             error: function(xhr, status, error) {
+                hideLoading('step-manufacturer');
                 console.error('Manufacturers error:', {xhr, status, error});
                 $('#step-manufacturer .mgu-api-step-result').removeClass('success').addClass('error')
                     .html('Failed to load manufacturers. <a href="#" class="retry-manufacturers">Click to retry</a>');
@@ -117,6 +141,9 @@ jQuery(document).ready(function($) {
         // Clear any existing error messages
         $('#step-model .mgu-api-step-result').removeClass('error success').empty();
         
+        // Show loading state
+        showLoading('step-model');
+        
         // Load models
         $.ajax({
             url: mgu_api.ajax_url,
@@ -128,6 +155,7 @@ jQuery(document).ready(function($) {
                 nonce: mgu_api.nonce
             },
             success: function(response) {
+                hideLoading('step-model');
                 console.log('Models response:', response);
                 console.log('Models response success:', response.success);
                 console.log('Models response data:', response.data);
@@ -166,6 +194,7 @@ jQuery(document).ready(function($) {
                 }
             },
             error: function(xhr, status, error) {
+                hideLoading('step-model');
                 console.error('Models error:', {xhr, status, error});
                 $('#step-model .mgu-api-step-result').removeClass('success').addClass('error')
                     .text('Failed to load models');
@@ -413,6 +442,9 @@ jQuery(document).ready(function($) {
         console.log('DEBUG - Customer data being sent:', JSON.stringify(customerData, null, 2));
         console.log('DEBUG - Current quote data:', JSON.stringify(window.currentQuoteData, null, 2));
 
+        // Show loading state on policy step
+        showLoading('step-policy');
+        
         // Create the customer (V2 API - payment happens later in the flow)
         $.ajax({
             url: mgu_api.ajax_url,
@@ -571,6 +603,7 @@ jQuery(document).ready(function($) {
     });
 
     function showError(stepId, message) {
+        hideLoading(stepId);
         $(`#${stepId} .mgu-api-step-result`)
             .removeClass('success')
             .addClass('error')
@@ -578,6 +611,7 @@ jQuery(document).ready(function($) {
     }
 
     function showSuccess(stepId, message) {
+        hideLoading(stepId);
         $(`#${stepId} .mgu-api-step-result`)
             .removeClass('error')
             .addClass('success')
@@ -648,6 +682,9 @@ jQuery(document).ready(function($) {
         
         console.log('DEBUG - Populating premium period options for product:', productId, 'memory:', memoryInstalled, 'price:', purchasePrice);
         
+        // Show loading state
+        showLoading('step-device');
+        
         $.ajax({
             url: mgu_api.ajax_url,
             type: 'POST',
@@ -663,6 +700,7 @@ jQuery(document).ready(function($) {
                 nonce: mgu_api.nonce
             },
             success: function(response) {
+                hideLoading('step-device');
                 console.log('DEBUG - Quote response for premium period options:', response);
                 if (response.success && response.data) {
                     const quoteData = response.data;
@@ -717,6 +755,7 @@ jQuery(document).ready(function($) {
                 }
             },
             error: function(xhr, status, error) {
+                hideLoading('step-device');
                 console.error('Error getting quote for premium period options:', {xhr, status, error});
             }
         });
