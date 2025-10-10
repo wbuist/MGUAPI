@@ -19,6 +19,24 @@ class MGU_API {
     protected $loader;
 
     /**
+     * The unique identifier of this plugin.
+     *
+     * @since    1.0.0
+     * @access   protected
+     * @var      string    $plugin_name    The string used to uniquely identify this plugin.
+     */
+    protected $plugin_name;
+
+    /**
+     * The current version of the plugin.
+     *
+     * @since    1.0.0
+     * @access   protected
+     * @var      string    $version    The current version of the plugin.
+     */
+    protected $version;
+
+    /**
      * Initialize the class and set its properties.
      */
     public function __construct() {
@@ -111,8 +129,8 @@ class MGU_API {
         add_action('wp_ajax_mgu_api_confirm_basket', array($this, 'ajax_confirm_basket'));
         add_action('wp_ajax_nopriv_mgu_api_confirm_basket', array($this, 'ajax_confirm_basket'));
         
-        add_action('wp_ajax_mgu_api_create_policy', array($this, 'ajax_create_policy'));
-        add_action('wp_ajax_nopriv_mgu_api_create_policy', array($this, 'ajax_create_policy'));
+        add_action('wp_ajax_mgu_api_pay_by_direct_debit', array($this, 'ajax_pay_by_direct_debit'));
+        add_action('wp_ajax_nopriv_mgu_api_pay_by_direct_debit', array($this, 'ajax_pay_by_direct_debit'));
     }
 
     /**
@@ -127,8 +145,11 @@ class MGU_API {
         }
         
         $gadget_type = isset($_POST['gadget_type']) ? sanitize_text_field($_POST['gadget_type']) : '';
-        if (empty($gadget_type)) {
-            wp_send_json_error('Gadget type is required');
+        
+        // Validate gadget type against allowed values from Swagger
+        $allowed_gadget_types = array('None', 'MobilePhone', 'Laptop', 'Tablet', 'VRHeadset', 'Watch', 'GamesConsole');
+        if (!in_array($gadget_type, $allowed_gadget_types)) {
+            wp_send_json_error('Invalid gadget type');
             return;
         }
         
@@ -147,24 +168,29 @@ class MGU_API {
      * AJAX handler for getting models
      */
     public function ajax_get_models() {
-
-        
         // Verify nonce
-        if (!check_ajax_referer('mgu_api_nonce', 'nonce', false)) {
+        if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'mgu_api_nonce')) {
             wp_send_json_error('Invalid security token');
             return;
         }
         
-        $manufacturer_id = isset($_POST['manufacturer_id']) ? sanitize_text_field($_POST['manufacturer_id']) : '';
+        $manufacturer_id = isset($_POST['manufacturer_id']) ? intval($_POST['manufacturer_id']) : 0;
         $gadget_type = isset($_POST['gadget_type']) ? sanitize_text_field($_POST['gadget_type']) : '';
         
-        if (empty($manufacturer_id)) {
-            wp_send_json_error('Manufacturer ID is required');
+        if (empty($manufacturer_id) || $manufacturer_id <= 0) {
+            wp_send_json_error('Valid manufacturer ID is required');
             return;
         }
         
         if (empty($gadget_type)) {
             wp_send_json_error('Gadget type is required');
+            return;
+        }
+        
+        // Validate gadget type against allowed values from Swagger
+        $allowed_gadget_types = array('None', 'MobilePhone', 'Laptop', 'Tablet', 'VRHeadset', 'Watch', 'GamesConsole');
+        if (!in_array($gadget_type, $allowed_gadget_types)) {
+            wp_send_json_error('Invalid gadget type');
             return;
         }
         
@@ -201,15 +227,26 @@ class MGU_API {
             return;
         }
 
-        // Validate required fields
-        if (empty($device_data['ManufacturerID']) || empty($device_data['GadgetType']) || empty($device_data['Model'])) {
+        // Validate required fields for V2 API
+        if (empty($device_data['productId']) || empty($device_data['memoryInstalled'])) {
             error_log('Missing required fields in device data: ' . print_r($device_data, true));
-            wp_send_json_error('Manufacturer ID, Gadget Type, and Model are required');
+            wp_send_json_error('Product ID and Memory Installed are required');
             return;
         }
         
+        // Validate purchase price if provided (it's optional)
+        $purchase_price = 0; // Default value
+        if (!empty($device_data['purchasePrice'])) {
+            if (!is_numeric($device_data['purchasePrice']) || $device_data['purchasePrice'] <= 0) {
+                error_log('Invalid purchase price: ' . $device_data['purchasePrice']);
+                wp_send_json_error('Purchase price must be a valid positive number if provided');
+                return;
+            }
+            $purchase_price = $device_data['purchasePrice'];
+        }
+        
         $api_client = new MGU_API_Client();
-        $response = $api_client->get_quote($device_data);
+        $response = $api_client->get_quote_v2($device_data['productId'], $device_data['memoryInstalled'], $purchase_price);
         
         if (is_wp_error($response)) {
             error_log('API Error: ' . $response->get_error_message());
@@ -242,6 +279,7 @@ class MGU_API {
         }
         
         $customer_data = isset($_POST['customer_data']) ? $_POST['customer_data'] : array();
+        
         if (empty($customer_data)) {
             error_log('No customer data provided');
             wp_send_json_error('Customer data is required');
@@ -253,12 +291,37 @@ class MGU_API {
             $customer_data['marketingOk'] = filter_var($customer_data['marketingOk'], FILTER_VALIDATE_BOOLEAN);
         }
 
-        // Validate required fields
+        // Validate required fields according to TGadgetCustomer specification
         $required_fields = array('givenName', 'lastName', 'email', 'mobileNumber', 'address1', 'postCode');
         foreach ($required_fields as $field) {
             if (empty($customer_data[$field])) {
                 error_log("Missing required field: {$field}");
                 wp_send_json_error("Missing required field: {$field}");
+                return;
+            }
+        }
+
+        // Validate field lengths according to Swagger specification
+        $field_lengths = array(
+            'title' => 4,
+            'givenName' => 25,
+            'lastName' => 30,
+            'companyName' => 250,
+            'address1' => 25,
+            'address2' => 25,
+            'address3' => 25,
+            'address4' => 25,
+            'postCode' => 9,
+            'email' => 75,
+            'mobileNumber' => 25,
+            'homePhone' => 25,
+            'externalId' => 75
+        );
+
+        foreach ($field_lengths as $field => $max_length) {
+            if (isset($customer_data[$field]) && strlen($customer_data[$field]) > $max_length) {
+                error_log("Field {$field} exceeds maximum length of {$max_length}");
+                wp_send_json_error("Field {$field} exceeds maximum length of {$max_length}");
                 return;
             }
         }
@@ -303,6 +366,20 @@ class MGU_API {
             return;
         }
         
+        // Validate premium period enum values
+        $allowed_premium_periods = array('Month', 'Annual');
+        if (!in_array($premium_period, $allowed_premium_periods)) {
+            wp_send_json_error('Premium period must be "Month" or "Annual"');
+            return;
+        }
+        
+        // Validate include loss cover enum values
+        $allowed_loss_cover = array('Yes', 'No');
+        if (!in_array($include_loss_cover, $allowed_loss_cover)) {
+            wp_send_json_error('Include loss cover must be "Yes" or "No"');
+            return;
+        }
+        
         error_log('Opening basket for customer: ' . $customer_id);
         $api_client = new MGU_API_Client();
         $response = $api_client->open_basket($customer_id, $premium_period, $include_loss_cover);
@@ -342,9 +419,29 @@ class MGU_API {
             return;
         }
         
+        // Ensure premiumId is an integer (required by API)
+        if (isset($gadget_data['premiumId'])) {
+            $gadget_data['premiumId'] = intval($gadget_data['premiumId']);
+        }
+        
+        // Ensure purchasePrice is a number (required by API)
+        if (isset($gadget_data['purchasePrice'])) {
+            $gadget_data['purchasePrice'] = floatval($gadget_data['purchasePrice']);
+        }
+        
         error_log('Adding gadget to basket: ' . $basket_id);
         $api_client = new MGU_API_Client();
-        $response = $api_client->add_gadgets($basket_id, array($gadget_data));
+        
+        // Extract V2 API parameters from gadget_data
+        $product_id = isset($gadget_data['productId']) ? intval($gadget_data['productId']) : 0;
+        $date_of_purchase = isset($gadget_data['dateOfPurchase']) ? sanitize_text_field($gadget_data['dateOfPurchase']) : '';
+        $serial_number = isset($gadget_data['serialNumber']) ? sanitize_text_field($gadget_data['serialNumber']) : '';
+        $installed_memory = isset($gadget_data['installedMemory']) ? sanitize_text_field($gadget_data['installedMemory']) : '';
+        $purchase_price = isset($gadget_data['purchasePrice']) ? floatval($gadget_data['purchasePrice']) : 0;
+        
+        error_log('V2 API parameters: productId=' . $product_id . ', dateOfPurchase=' . $date_of_purchase . ', serialNumber=' . $serial_number . ', installedMemory=' . $installed_memory . ', purchasePrice=' . $purchase_price);
+        
+        $response = $api_client->insure_gadget($basket_id, $product_id, $date_of_purchase, $serial_number, $installed_memory, $purchase_price);
         
         if (is_wp_error($response)) {
             error_log('API Error: ' . $response->get_error_message());
@@ -391,36 +488,85 @@ class MGU_API {
         }
         
         error_log('Basket confirmed successfully: ' . print_r($response, true));
+        
+        // If payment is required, automatically process it with stored payment data
+        if (isset($response['Outcome']) && $response['Outcome'] === 'PaymentRequired') {
+            error_log('Payment required, processing with stored payment data');
+            
+            // Get customer ID from basket (we need to find a way to get this)
+            // For now, we'll need to pass the customer ID in the request
+            $customer_id = isset($_POST['customer_id']) ? intval($_POST['customer_id']) : 0;
+            
+            if ($customer_id) {
+                // Retrieve stored payment data
+                $payment_data = get_transient('mgu_payment_data_' . $customer_id);
+                
+                if ($payment_data) {
+                    error_log('Found stored payment data for customer: ' . $customer_id);
+                    
+                    // Process direct debit payment
+                    $payment_response = $api_client->pay_by_direct_debit($basket_id, $payment_data);
+                    
+                    if (is_wp_error($payment_response)) {
+                        error_log('Payment processing error: ' . $payment_response->get_error_message());
+                        // Don't fail the entire process, just log the error
+                    } else {
+                        error_log('Payment processed successfully: ' . print_r($payment_response, true));
+                        // Update the response with payment result
+                        $response = $payment_response;
+                        
+                        // Clean up stored payment data
+                        delete_transient('mgu_payment_data_' . $customer_id);
+                    }
+                } else {
+                    error_log('No stored payment data found for customer: ' . $customer_id);
+                }
+            } else {
+                error_log('No customer ID provided for payment processing');
+            }
+        }
+        
         error_log('=== End Confirm Basket Debug ===');
         wp_send_json_success($response);
     }
 
     /**
-     * AJAX handler for creating a policy
+     * AJAX handler for paying by direct debit
      */
-    public function ajax_create_policy() {
-        error_log('=== Create Policy Debug ===');
-        error_log('AJAX request received for creating policy');
+    public function ajax_pay_by_direct_debit() {
+        error_log('=== Pay By Direct Debit Debug ===');
+        error_log('AJAX request received for direct debit payment');
         error_log('POST data: ' . print_r($_POST, true));
         
         // Verify nonce
         if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'mgu_api_nonce')) {
-            error_log('Nonce verification failed for creating policy');
+            error_log('Nonce verification failed for direct debit payment');
             wp_send_json_error('Invalid security token');
             return;
         }
         
-        $policy_data = isset($_POST['policy_data']) ? $_POST['policy_data'] : array();
+        $basket_id = isset($_POST['basket_id']) ? intval($_POST['basket_id']) : 0;
+        $direct_debit = isset($_POST['direct_debit']) ? $_POST['direct_debit'] : array();
         
-        if (empty($policy_data)) {
-            error_log('No policy data provided');
-            wp_send_json_error('Policy data is required');
+        if (!$basket_id || empty($direct_debit)) {
+            error_log('Missing required fields for direct debit payment');
+            wp_send_json_error('Missing required fields');
             return;
         }
         
-        error_log('Creating policy with data: ' . print_r($policy_data, true));
+        // Validate direct debit data
+        $required_fields = ['NameOnAccount', 'AccountNumber', 'SortCode'];
+        foreach ($required_fields as $field) {
+            if (empty($direct_debit[$field])) {
+                error_log('Missing required direct debit field: ' . $field);
+                wp_send_json_error('Missing required field: ' . $field);
+                return;
+            }
+        }
+        
+        error_log('Processing direct debit payment for basket: ' . $basket_id);
         $api_client = new MGU_API_Client();
-        $response = $api_client->create_policy($policy_data);
+        $response = $api_client->pay_by_direct_debit($basket_id, $direct_debit);
         
         if (is_wp_error($response)) {
             error_log('API Error: ' . $response->get_error_message());
@@ -428,8 +574,8 @@ class MGU_API {
             return;
         }
         
-        error_log('Policy created successfully: ' . print_r($response, true));
-        error_log('=== End Create Policy Debug ===');
+        error_log('Direct debit payment processed successfully: ' . print_r($response, true));
+        error_log('=== End Pay By Direct Debit Debug ===');
         wp_send_json_success($response);
     }
 
@@ -448,6 +594,40 @@ class MGU_API {
      * @since    1.0.0
      */
     public function register_settings() {
+        // Environment setting
+        register_setting('mgu_api_options', 'mgu_api_environment', array(
+            'type' => 'string',
+            'sanitize_callback' => array($this, 'sanitize_environment'),
+            'default' => 'sandbox'
+        ));
+
+        // Sandbox credentials
+        register_setting('mgu_api_options', 'mgu_api_sandbox_client_id', array(
+            'type' => 'string',
+            'sanitize_callback' => array($this, 'sanitize_client_id'),
+            'default' => 'APITEST001'
+        ));
+
+        register_setting('mgu_api_options', 'mgu_api_sandbox_client_secret', array(
+            'type' => 'string',
+            'sanitize_callback' => array($this, 'sanitize_client_secret'),
+            'default' => ''
+        ));
+
+        // Production credentials
+        register_setting('mgu_api_options', 'mgu_api_production_client_id', array(
+            'type' => 'string',
+            'sanitize_callback' => array($this, 'sanitize_client_id'),
+            'default' => ''
+        ));
+
+        register_setting('mgu_api_options', 'mgu_api_production_client_secret', array(
+            'type' => 'string',
+            'sanitize_callback' => array($this, 'sanitize_client_secret'),
+            'default' => ''
+        ));
+
+        // Legacy settings for backward compatibility
         register_setting('mgu_api_options', 'mgu_api_endpoint', array(
             'type' => 'string',
             'sanitize_callback' => array($this, 'sanitize_endpoint'),
@@ -474,25 +654,25 @@ class MGU_API {
         );
 
         add_settings_field(
-            'mgu_api_endpoint',
-            'API Endpoint',
-            array($this, 'endpoint_field_callback'),
+            'mgu_api_environment',
+            'Environment',
+            array($this, 'environment_field_callback'),
             'mgu_api_options',
             'mgu_api_main_section'
         );
 
         add_settings_field(
-            'mgu_api_client_id',
-            'Client ID',
-            array($this, 'client_id_field_callback'),
+            'mgu_api_sandbox_credentials',
+            'Sandbox Credentials',
+            array($this, 'sandbox_credentials_field_callback'),
             'mgu_api_options',
             'mgu_api_main_section'
         );
 
         add_settings_field(
-            'mgu_api_client_secret',
-            'Client Secret',
-            array($this, 'client_secret_field_callback'),
+            'mgu_api_production_credentials',
+            'Production Credentials',
+            array($this, 'production_credentials_field_callback'),
             'mgu_api_options',
             'mgu_api_main_section'
         );
@@ -504,11 +684,69 @@ class MGU_API {
      * @since    1.0.0
      */
     public function section_callback() {
-        echo '<p>' . __('Configure your MGU API settings below.', 'mgu-api-integration') . '</p>';
+        echo '<p>' . __('Configure your MGU API settings below. Choose between sandbox (for testing) and production (for live transactions).', 'mgu-api-integration') . '</p>';
     }
 
     /**
-     * API Endpoint field callback
+     * Environment field callback
+     *
+     * @since    1.0.0
+     */
+    public function environment_field_callback() {
+        $environment = get_option('mgu_api_environment', 'sandbox');
+        echo '<select name="mgu_api_environment" id="mgu_api_environment">';
+        echo '<option value="sandbox" ' . selected($environment, 'sandbox', false) . '>' . __('Sandbox (Testing)', 'mgu-api-integration') . '</option>';
+        echo '<option value="production" ' . selected($environment, 'production', false) . '>' . __('Production (Live)', 'mgu-api-integration') . '</option>';
+        echo '</select>';
+        echo '<p class="description">' . __('Select the environment to use. Sandbox for testing, Production for live transactions.', 'mgu-api-integration') . '</p>';
+    }
+
+    /**
+     * Sandbox credentials field callback
+     *
+     * @since    1.0.0
+     */
+    public function sandbox_credentials_field_callback() {
+        $client_id = get_option('mgu_api_sandbox_client_id');
+        $client_secret = get_option('mgu_api_sandbox_client_secret');
+        
+        echo '<table class="form-table">';
+        echo '<tr>';
+        echo '<td><label for="mgu_api_sandbox_client_id">' . __('Client ID:', 'mgu-api-integration') . '</label></td>';
+        echo '<td><input type="text" name="mgu_api_sandbox_client_id" id="mgu_api_sandbox_client_id" value="' . esc_attr($client_id) . '" class="regular-text" /></td>';
+        echo '</tr>';
+        echo '<tr>';
+        echo '<td><label for="mgu_api_sandbox_client_secret">' . __('Client Secret:', 'mgu-api-integration') . '</label></td>';
+        echo '<td><input type="password" name="mgu_api_sandbox_client_secret" id="mgu_api_sandbox_client_secret" value="' . esc_attr($client_secret) . '" class="regular-text" /></td>';
+        echo '</tr>';
+        echo '</table>';
+        echo '<p class="description">' . __('Enter your sandbox credentials for testing. These are used when Environment is set to Sandbox.', 'mgu-api-integration') . '</p>';
+    }
+
+    /**
+     * Production credentials field callback
+     *
+     * @since    1.0.0
+     */
+    public function production_credentials_field_callback() {
+        $client_id = get_option('mgu_api_production_client_id');
+        $client_secret = get_option('mgu_api_production_client_secret');
+        
+        echo '<table class="form-table">';
+        echo '<tr>';
+        echo '<td><label for="mgu_api_production_client_id">' . __('Client ID:', 'mgu-api-integration') . '</label></td>';
+        echo '<td><input type="text" name="mgu_api_production_client_id" id="mgu_api_production_client_id" value="' . esc_attr($client_id) . '" class="regular-text" /></td>';
+        echo '</tr>';
+        echo '<tr>';
+        echo '<td><label for="mgu_api_production_client_secret">' . __('Client Secret:', 'mgu-api-integration') . '</label></td>';
+        echo '<td><input type="password" name="mgu_api_production_client_secret" id="mgu_api_production_client_secret" value="' . esc_attr($client_secret) . '" class="regular-text" /></td>';
+        echo '</tr>';
+        echo '</table>';
+        echo '<p class="description">' . __('Enter your production credentials for live transactions. These are used when Environment is set to Production.', 'mgu-api-integration') . '</p>';
+    }
+
+    /**
+     * Legacy API Endpoint field callback (for backward compatibility)
      *
      * @since    1.0.0
      */
@@ -519,7 +757,7 @@ class MGU_API {
     }
 
     /**
-     * Client ID field callback
+     * Legacy Client ID field callback (for backward compatibility)
      *
      * @since    1.0.0
      */
@@ -530,7 +768,7 @@ class MGU_API {
     }
 
     /**
-     * Client Secret field callback
+     * Legacy Client Secret field callback (for backward compatibility)
      *
      * @since    1.0.0
      */
@@ -698,5 +936,90 @@ class MGU_API {
     public function sanitize_client_secret($input) {
         $sanitized = sanitize_text_field($input);
         return $sanitized;
+    }
+
+    public function sanitize_environment($input) {
+        $allowed_values = array('sandbox', 'production');
+        $sanitized = sanitize_text_field($input);
+        
+        if (!in_array($sanitized, $allowed_values)) {
+            $sanitized = 'sandbox'; // Default to sandbox if invalid
+        }
+        
+        return $sanitized;
+    }
+
+    /**
+     * Get the current environment setting
+     *
+     * @since    1.0.0
+     * @return   string
+     */
+    public function get_current_environment() {
+        return get_option('mgu_api_environment', 'sandbox');
+    }
+
+    /**
+     * Get the current environment's client ID
+     *
+     * @since    1.0.0
+     * @return   string
+     */
+    public function get_current_client_id() {
+        $environment = $this->get_current_environment();
+        
+        if ($environment === 'production') {
+            return get_option('mgu_api_production_client_id', '');
+        }
+        
+        return get_option('mgu_api_sandbox_client_id', 'APITEST001');
+    }
+
+    /**
+     * Get the current environment's client secret
+     *
+     * @since    1.0.0
+     * @return   string
+     */
+    public function get_current_client_secret() {
+        $environment = $this->get_current_environment();
+        
+        if ($environment === 'production') {
+            return get_option('mgu_api_production_client_secret', '');
+        }
+        
+        return get_option('mgu_api_sandbox_client_secret', '');
+    }
+
+    /**
+     * Get the current environment's base URL
+     *
+     * @since    1.0.0
+     * @return   string
+     */
+    public function get_current_base_url() {
+        $environment = $this->get_current_environment();
+        
+        if ($environment === 'production') {
+            return 'https://api.mygadgetumbrella.com/api';
+        }
+        
+        return 'https://sandbox.api.mygadgetumbrella.com/sbapi';
+    }
+
+    /**
+     * Get the current environment's auth URL
+     *
+     * @since    1.0.0
+     * @return   string
+     */
+    public function get_current_auth_url() {
+        $environment = $this->get_current_environment();
+        
+        if ($environment === 'production') {
+            return 'https://api.mygadgetumbrella.com/auth';
+        }
+        
+        return 'https://sandbox.api.mygadgetumbrella.com/sbauth';
     }
 } 

@@ -59,19 +59,27 @@ class MGU_API_Client {
      * @since    1.0.0
      */
     public function __construct() {
-        $this->endpoint = get_option('mgu_api_endpoint');
-        $this->client_id = get_option('mgu_api_client_id');
-        $this->client_secret = get_option('mgu_api_client_secret');
+        // Get the main plugin instance to access environment settings
+        global $mgu_api_plugin;
+        if ($mgu_api_plugin) {
+            $this->endpoint = $mgu_api_plugin->get_current_base_url();
+            $this->client_id = $mgu_api_plugin->get_current_client_id();
+            $this->client_secret = $mgu_api_plugin->get_current_client_secret();
+        } else {
+            // Fallback to legacy settings
+            $this->endpoint = get_option('mgu_api_endpoint', 'https://sandbox.api.mygadgetumbrella.com');
+            $this->client_id = get_option('mgu_api_client_id', 'APITEST001');
+            $this->client_secret = get_option('mgu_api_client_secret', '');
+        }
+        
         $this->access_token = '';
+        $this->token_expiry = 0;
         $this->logger = new MGU_API_Logger();
 
-        // error_log('MGU API Debug - Constructor values:');
-        // error_log('MGU API Debug - endpoint from option: ' . get_option('mgu_api_endpoint'));
-        // error_log('MGU API Debug - client_id from option: ' . get_option('mgu_api_client_id'));
-        // error_log('MGU API Debug - client_secret from option: ' . substr(get_option('mgu_api_client_secret'), 0, 5) . '...');
-        // error_log('MGU API Debug - endpoint property: ' . $this->endpoint);
-        // error_log('MGU API Debug - client_id property: ' . $this->client_id);
-        // error_log('MGU API Debug - client_secret property: ' . substr($this->client_secret, 0, 5) . '...');
+        error_log('MGU API Debug - Constructor values:');
+        error_log('MGU API Debug - endpoint: ' . $this->endpoint);
+        error_log('MGU API Debug - client_id: ' . $this->client_id);
+        error_log('MGU API Debug - client_secret: ' . substr($this->client_secret, 0, 5) . '...');
     }
 
     /**
@@ -89,16 +97,27 @@ class MGU_API_Client {
      * Refresh the access token
      */
     private function refresh_token() {
-        if (empty($this->endpoint) || empty($this->client_id) || empty($this->client_secret)) {
-            // error_log('MGU API Debug - Token refresh failed: Missing configuration');
-            // error_log('MGU API Debug - endpoint: ' . $this->endpoint);
-            // error_log('MGU API Debug - client_id: ' . $this->client_id);
-            // error_log('MGU API Debug - client_secret: ' . substr($this->client_secret, 0, 5) . '...');
+        if (empty($this->client_id) || empty($this->client_secret)) {
+            error_log('MGU API Debug - Token refresh failed: Missing credentials');
+            error_log('MGU API Debug - client_id: ' . $this->client_id);
+            error_log('MGU API Debug - client_secret: ' . substr($this->client_secret, 0, 5) . '...');
             return false;
         }
 
-        $auth_url = rtrim($this->endpoint, '/') . '/sbauth/oauth/token';
-        // error_log('MGU API Debug - Token refresh URL: ' . $auth_url);
+        // Get the auth URL from the plugin instance
+        global $mgu_api_plugin;
+        error_log('MGU API Debug - Plugin instance available: ' . ($mgu_api_plugin ? 'Yes' : 'No'));
+        
+        if ($mgu_api_plugin) {
+            $auth_url = $mgu_api_plugin->get_current_auth_url() . '/oauth/token';
+            error_log('MGU API Debug - Using plugin auth URL: ' . $auth_url);
+        } else {
+            // Fallback to legacy URL construction
+            $auth_url = 'https://sandbox.api.mygadgetumbrella.com/sbauth/oauth/token';
+            error_log('MGU API Debug - Using fallback auth URL: ' . $auth_url);
+        }
+        
+        error_log('MGU API Debug - Final token refresh URL: ' . $auth_url);
         
         $response = wp_remote_post($auth_url, array(
             'headers' => array(
@@ -113,23 +132,23 @@ class MGU_API_Client {
         ));
 
         if (is_wp_error($response)) {
-            // error_log('MGU API Debug - Token refresh request failed: ' . $response->get_error_message());
+            error_log('MGU API Debug - Token refresh request failed: ' . $response->get_error_message());
             return false;
         }
 
         $body = wp_remote_retrieve_body($response);
         $data = json_decode($body, true);
-        // error_log('MGU API Debug - Token refresh response: ' . $body);
+        error_log('MGU API Debug - Token refresh response: ' . $body);
 
         if (empty($data['access_token'])) {
-            // error_log('MGU API Debug - Invalid token response: ' . print_r($data, true));
+            error_log('MGU API Debug - Invalid token response: ' . print_r($data, true));
             return false;
         }
 
         $this->access_token = $data['access_token'];
         $this->token_expiry = time() + $data['expires_in'];
         
-        // error_log('MGU API Debug - Token refresh successful, expires in: ' . $data['expires_in'] . ' seconds');
+        error_log('MGU API Debug - Token refresh successful, expires in: ' . $data['expires_in'] . ' seconds');
         return true;
     }
 
@@ -140,9 +159,10 @@ class MGU_API_Client {
      * @param    string    $endpoint    The API endpoint to call.
      * @param    string    $method      The HTTP method to use.
      * @param    array     $data        The data to send with the request.
+     * @param    array     $query_params Query parameters for the request.
      * @return   array|WP_Error        The API response or WP_Error on failure.
      */
-    private function make_request($endpoint, $method = 'GET', $data = array()) {
+    private function make_request($endpoint, $method = 'GET', $data = array(), $query_params = array()) {
         if (empty($this->endpoint) || empty($this->client_id)) {
             error_log('MGU API Debug - Configuration missing: endpoint=' . $this->endpoint . ', client_id=' . $this->client_id);
             return new WP_Error('config_error', 'API endpoint or key not configured');
@@ -155,6 +175,12 @@ class MGU_API_Client {
         if ($method === 'GET' && !empty($data)) {
             $url = add_query_arg($data, $url);
             error_log('MGU API Debug - GET parameters: ' . print_r($data, true));
+        }
+        
+        // For POST requests with query parameters (like addGadgets)
+        if ($method === 'POST' && !empty($query_params)) {
+            $url = add_query_arg($query_params, $url);
+            error_log('MGU API Debug - POST query parameters: ' . print_r($query_params, true));
         }
 
         // Get a valid token
@@ -190,7 +216,7 @@ class MGU_API_Client {
 
         $response_code = wp_remote_retrieve_response_code($response);
         $body = wp_remote_retrieve_body($response);
-        $data = json_decode($body, true);
+        $response_data = json_decode($body, true);
         
         error_log('MGU API Debug - Response code: ' . $response_code);
         error_log('MGU API Debug - Response body: ' . $body);
@@ -199,16 +225,26 @@ class MGU_API_Client {
         if ($response_code === 401) {
             error_log('MGU API Debug - Token expired, attempting refresh');
             $this->access_token = null; // Force token refresh
-            return $this->make_request($endpoint, $method, $data); // Retry the request
+            return $this->make_request($endpoint, $method, $data); // Retry with original data
         }
 
         if ($response_code >= 400) {
-            $error_message = isset($data['message']) ? $data['message'] : 'Unknown error';
+            // Try multiple possible error message fields
+            $error_message = 'Unknown error';
+            if (isset($response_data['message'])) {
+                $error_message = $response_data['message'];
+            } elseif (isset($response_data['error'])) {
+                $error_message = $response_data['error'];
+            } elseif (isset($response_data['errors']) && is_array($response_data['errors'])) {
+                $error_message = implode(', ', $response_data['errors']);
+            } elseif (!empty($body)) {
+                $error_message = 'API Error: ' . $body;
+            }
             error_log('MGU API Debug - API error: ' . $error_message);
-            return new WP_Error('api_error', $error_message, $data);
+            return new WP_Error('api_error', $error_message, $response_data);
         }
 
-        return $data;
+        return $response_data;
     }
 
     /**
@@ -219,7 +255,7 @@ class MGU_API_Client {
      * @return   array|WP_Error             The API response or WP_Error on failure.
      */
     public function create_customer($customer_data) {
-        return $this->make_request('/sbapi/v1/newCustomer', 'POST', $customer_data);
+        return $this->make_request('/v2/customer', 'POST', $customer_data);
     }
 
     /**
@@ -230,7 +266,7 @@ class MGU_API_Client {
      * @return   array|WP_Error           The API response or WP_Error on failure.
      */
     public function find_customer($customer_id) {
-        return $this->make_request('findCustomer', 'GET', array('customerId' => $customer_id));
+        return $this->make_request('/v2/customer/' . $customer_id, 'GET');
     }
 
     /**
@@ -241,7 +277,7 @@ class MGU_API_Client {
      * @return   array|WP_Error           The API response or WP_Error on failure.
      */
     public function find_customer_by_external_id($external_id) {
-        return $this->make_request('findCustomerByExternalId', 'GET', array('externalId' => $external_id));
+        return $this->make_request('/v2/customer/find/externalid/' . $external_id, 'GET');
     }
 
     /**
@@ -254,7 +290,7 @@ class MGU_API_Client {
      * @return   array|WP_Error               The API response or WP_Error on failure.
      */
     public function open_basket($customer_id, $premium_period, $include_loss_cover) {
-        return $this->make_request('/sbapi/v1/openBasket', 'GET', array(
+        return $this->make_request('/v2/openBasket', 'GET', array(
             'customerId' => $customer_id,
             'premiumPeriod' => $premium_period,
             'includeLossCover' => $include_loss_cover
@@ -269,7 +305,7 @@ class MGU_API_Client {
      * @return   array|WP_Error         The API response or WP_Error on failure.
      */
     public function get_basket($basket_id) {
-        return $this->make_request('/sbapi/v1/getBasket', 'GET', array('basketId' => $basket_id));
+        return $this->make_request('/v2/getBasket', 'GET', array('basketId' => $basket_id));
     }
 
     /**
@@ -285,7 +321,7 @@ class MGU_API_Client {
         foreach ($gadgets as &$gadget) {
             $gadget['basketId'] = $basket_id;
         }
-        return $this->make_request('/sbapi/v1/addGadgets', 'POST', $gadgets);
+        return $this->make_request('/v2/insureGadgets', 'GET', array('basketId' => $basket_id));
     }
 
     /**
@@ -295,9 +331,13 @@ class MGU_API_Client {
      * @return array|WP_Error Array of manufacturers or WP_Error on failure
      */
     public function get_manufacturers($gadget_type) {
-        return $this->make_request('/sbapi/v1/manufacturers', 'GET',  array(
-            'GadgetType' => $gadget_type
-        ));
+        if ($gadget_type) {
+            return $this->make_request('/v2/manufacturersByGadget', 'GET', array(
+                'GadgetType' => $gadget_type
+            ));
+        } else {
+            return $this->make_request('/v2/manufacturers', 'GET');
+        }
     }
 
     /**
@@ -313,7 +353,7 @@ class MGU_API_Client {
         // error_log('Gadget Type: ' . $gadget_type);
         
         // For GET requests, we need to append the parameters to the URL
-        $endpoint = '/sbapi/v1/models?' . http_build_query(array(
+        $endpoint = '/v2/models?' . http_build_query(array(
             'ManufacturerId' => $manufacturer_id,
             'GadgetType' => $gadget_type
         ));
@@ -334,34 +374,6 @@ class MGU_API_Client {
     }
 
     /**
-     * Get premiums for a specific gadget.
-     *
-     * @since    1.0.0
-     * @param    integer   $premium_id    The premium ID.
-     * @return   array|WP_Error          The API response or WP_Error on failure.
-     */
-    public function get_gadget_premium($premium_id) {
-        return $this->make_request('gadgetPremium', 'GET', array('premiumId' => $premium_id));
-    }
-
-    /**
-     * Get premiums for a model.
-     *
-     * @since    1.0.0
-     * @param    integer   $manufacturer_id    The manufacturer ID.
-     * @param    string    $gadget_type        The gadget type.
-     * @param    string    $model              The model name.
-     * @return   array|WP_Error               The API response or WP_Error on failure.
-     */
-    public function get_gadget_premiums($manufacturer_id, $gadget_type, $model) {
-        return $this->make_request('gadgetPremiums', 'GET', array(
-            'ManufacturerId' => $manufacturer_id,
-            'GadgetType' => $gadget_type,
-            'Model' => $model
-        ));
-    }
-
-    /**
      * Confirm the basket.
      *
      * @since    1.0.0
@@ -369,7 +381,7 @@ class MGU_API_Client {
      * @return   array|WP_Error         The API response or WP_Error on failure.
      */
     public function confirm_basket($basket_id) {
-        return $this->make_request('/sbapi/v1/confirm', 'GET', array('basketId' => $basket_id));
+        return $this->make_request('/v2/confirm', 'GET', array('basketId' => $basket_id));
     }
 
     /**
@@ -381,40 +393,128 @@ class MGU_API_Client {
      * @return   array|WP_Error         The API response or WP_Error on failure.
      */
     public function pay_by_direct_debit($basket_id, $direct_debit) {
-        return $this->make_request('/sbapi/v1/payByDirectDebit', 'POST', array(
+        return $this->make_request('/v2/payByDirectDebit', 'POST', array(
             'basketId' => $basket_id,
             'directDebit' => $direct_debit
         ));
     }
 
     /**
-     * Test the API connection
+     * Add a single gadget to basket (V2 method)
+     *
+     * @since    1.0.0
+     * @param    integer   $basket_id         The basket ID.
+     * @param    integer   $product_id        The product ID.
+     * @param    string    $date_of_purchase  Date of purchase.
+     * @param    string    $serial_number     Serial number.
+     * @param    string    $installed_memory  Installed memory.
+     * @param    number    $purchase_price    Purchase price.
+     * @return   array|WP_Error              The API response or WP_Error on failure.
      */
-    public function test_connection() {
-        return $this->make_request('/sbapi/v1/manufacturers', 'GET');
+    public function insure_gadget($basket_id, $product_id, $date_of_purchase = '', $serial_number = '', $installed_memory = '', $purchase_price = 0) {
+        $params = array('basketId' => $basket_id);
+        
+        if ($product_id) $params['productId'] = $product_id;
+        if ($date_of_purchase) $params['dateOfPurchase'] = $date_of_purchase;
+        if ($serial_number) $params['serialNumber'] = $serial_number;
+        if ($installed_memory) $params['installedMemory'] = $installed_memory;
+        if ($purchase_price) $params['purchasePrice'] = $purchase_price;
+        
+        return $this->make_request('/v2/insureGadget', 'GET', $params);
     }
 
     /**
-     * Get a quote for a device
+     * Get quote for a specific product (V2 method)
      *
-     * @param array $device_data
-     * @return array|WP_Error
+     * @since    1.0.0
+     * @param    integer   $product_id        The product ID.
+     * @param    string    $memory_installed  Memory installed.
+     * @param    number    $purchase_price    Purchase price.
+     * @return   array|WP_Error              The API response or WP_Error on failure.
      */
-    public function get_quote($device_data) {
-        return $this->make_request('/sbapi/v1/gadgetPremiums', 'GET', array(
-            'ManufacturerId' => $device_data['ManufacturerID'],
-            'GadgetType' => $device_data['GadgetType'],
-            'Model' => $device_data['Model']
+    public function get_quote_v2($product_id, $memory_installed, $purchase_price) {
+        return $this->make_request('/v2/getQuote', 'GET', array(
+            'productId' => $product_id,
+            'memoryInstalled' => $memory_installed,
+            'purchasePrice' => $purchase_price
         ));
     }
 
     /**
-     * Create a new policy
+     * Add loss cover to basket (V2 method)
      *
-     * @param array $policy_data
-     * @return array|WP_Error
+     * @since    1.0.0
+     * @param    integer   $basket_id    The basket ID.
+     * @return   array|WP_Error         The API response or WP_Error on failure.
      */
-    public function create_policy($policy_data) {
-        return $this->make_request('/sbapi/v1/policies', 'POST', $policy_data);
+    public function add_loss_cover($basket_id) {
+        return $this->make_request('/v2/addLossCover', 'GET', array('basketId' => $basket_id));
     }
+
+    /**
+     * Remove loss cover from basket (V2 method)
+     *
+     * @since    1.0.0
+     * @param    integer   $basket_id    The basket ID.
+     * @return   array|WP_Error         The API response or WP_Error on failure.
+     */
+    public function remove_loss_cover($basket_id) {
+        return $this->make_request('/v2/removeLossCover', 'GET', array('basketId' => $basket_id));
+    }
+
+    /**
+     * Remove policy from basket (V2 method)
+     *
+     * @since    1.0.0
+     * @param    integer   $basket_id    The basket ID.
+     * @param    integer   $policy_id    The policy ID.
+     * @return   array|WP_Error         The API response or WP_Error on failure.
+     */
+    public function remove_policy($basket_id, $policy_id) {
+        return $this->make_request('/v2/removePolicy', 'GET', array(
+            'basketId' => $basket_id,
+            'policyId' => $policy_id
+        ));
+    }
+
+    /**
+     * Cancel basket (V2 method)
+     *
+     * @since    1.0.0
+     * @param    integer   $basket_id    The basket ID.
+     * @return   array|WP_Error         The API response or WP_Error on failure.
+     */
+    public function cancel_basket($basket_id) {
+        return $this->make_request('/v2/cancelBasket', 'GET', array('basketId' => $basket_id));
+    }
+
+    /**
+     * Find customer by email (V2 method)
+     *
+     * @since    1.0.0
+     * @param    string    $email_address    The email address.
+     * @return   array|WP_Error             The API response or WP_Error on failure.
+     */
+    public function find_customer_by_email($email_address) {
+        return $this->make_request('/v2/customer/find/emai/' . $email_address, 'GET');
+    }
+
+    /**
+     * Find customer by mobile (V2 method)
+     *
+     * @since    1.0.0
+     * @param    string    $mobile_number    The mobile number.
+     * @return   array|WP_Error             The API response or WP_Error on failure.
+     */
+    public function find_customer_by_mobile($mobile_number) {
+        return $this->make_request('/v2/customer/find/mobile/' . $mobile_number, 'GET');
+    }
+
+    /**
+     * Test the API connection
+     */
+    public function test_connection() {
+        return $this->make_request('/v2/manufacturers', 'GET');
+    }
+
 } 
