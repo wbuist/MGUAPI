@@ -129,9 +129,6 @@ class MGU_API {
         add_action('wp_ajax_mgu_api_confirm_basket', array($this, 'ajax_confirm_basket'));
         add_action('wp_ajax_nopriv_mgu_api_confirm_basket', array($this, 'ajax_confirm_basket'));
         
-        add_action('wp_ajax_mgu_api_create_policy', array($this, 'ajax_create_policy'));
-        add_action('wp_ajax_nopriv_mgu_api_create_policy', array($this, 'ajax_create_policy'));
-        
         add_action('wp_ajax_mgu_api_pay_by_direct_debit', array($this, 'ajax_pay_by_direct_debit'));
         add_action('wp_ajax_nopriv_mgu_api_pay_by_direct_debit', array($this, 'ajax_pay_by_direct_debit'));
     }
@@ -282,33 +279,16 @@ class MGU_API {
         }
         
         $customer_data = isset($_POST['customer_data']) ? $_POST['customer_data'] : array();
-        $payment_data = isset($_POST['payment_data']) ? $_POST['payment_data'] : array();
         
         if (empty($customer_data)) {
             error_log('No customer data provided');
             wp_send_json_error('Customer data is required');
             return;
         }
-        
-        if (empty($payment_data)) {
-            error_log('No payment data provided');
-            wp_send_json_error('Payment data is required');
-            return;
-        }
 
         // Convert marketingOk to boolean
         if (isset($customer_data['marketingOk'])) {
             $customer_data['marketingOk'] = filter_var($customer_data['marketingOk'], FILTER_VALIDATE_BOOLEAN);
-        }
-
-        // Validate payment data
-        $required_payment_fields = array('NameOnAccount', 'AccountNumber', 'SortCode');
-        foreach ($required_payment_fields as $field) {
-            if (empty($payment_data[$field])) {
-                error_log("Missing required payment field: {$field}");
-                wp_send_json_error("Missing required payment field: {$field}");
-                return;
-            }
         }
 
         // Validate required fields according to TGadgetCustomer specification
@@ -354,14 +334,6 @@ class MGU_API {
             error_log('API Error: ' . $response->get_error_message());
             wp_send_json_error($response->get_error_message());
             return;
-        }
-        
-        // Store payment data for later use (when basket is confirmed)
-        if (isset($response['value']) && is_numeric($response['value'])) {
-            $customer_id = $response['value'];
-            // Store payment data in WordPress transients (temporary storage)
-            set_transient('mgu_payment_data_' . $customer_id, $payment_data, 3600); // Expires in 1 hour
-            error_log('Payment data stored for customer ID: ' . $customer_id);
         }
         
         error_log('Customer creation response: ' . print_r($response, true));
@@ -555,44 +527,6 @@ class MGU_API {
         }
         
         error_log('=== End Confirm Basket Debug ===');
-        wp_send_json_success($response);
-    }
-
-    /**
-     * AJAX handler for creating a policy
-     */
-    public function ajax_create_policy() {
-        error_log('=== Create Policy Debug ===');
-        error_log('AJAX request received for creating policy');
-        error_log('POST data: ' . print_r($_POST, true));
-        
-        // Verify nonce
-        if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'mgu_api_nonce')) {
-            error_log('Nonce verification failed for creating policy');
-            wp_send_json_error('Invalid security token');
-            return;
-        }
-        
-        $policy_data = isset($_POST['policy_data']) ? $_POST['policy_data'] : array();
-        
-        if (empty($policy_data)) {
-            error_log('No policy data provided');
-            wp_send_json_error('Policy data is required');
-            return;
-        }
-        
-        error_log('Creating policy with data: ' . print_r($policy_data, true));
-        $api_client = new MGU_API_Client();
-        $response = $api_client->create_policy($policy_data);
-        
-        if (is_wp_error($response)) {
-            error_log('API Error: ' . $response->get_error_message());
-            wp_send_json_error($response->get_error_message());
-            return;
-        }
-        
-        error_log('Policy created successfully: ' . print_r($response, true));
-        error_log('=== End Create Policy Debug ===');
         wp_send_json_success($response);
     }
 
