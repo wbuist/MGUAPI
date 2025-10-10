@@ -10,44 +10,44 @@ The MGU API Integration plugin is a WordPress plugin that provides integration w
 
 1. **Manufacturer Selection**
    - Fetches manufacturers by gadget type (MobilePhone, Laptop, Tablet, etc.)
-   - Uses endpoint: `/sbapi/v1/manufacturersByGadget`
+   - Uses endpoint: `/v2/manufacturersByGadget`
    - Validates gadget types against Swagger specification
 
 2. **Model Selection**
    - Retrieves available models for selected manufacturer and gadget type
-   - Uses endpoint: `/sbapi/v1/models`
+   - Uses endpoint: `/v2/models`
    - Returns models with memory options and product details
 
 3. **Quote Generation**
    - Gets premium quotes for specific gadget models
-   - Uses endpoint: `/sbapi/v1/gadgetPremiums`
+   - Uses endpoint: `/v2/getQuote`
    - Returns pricing information including monthly/annual premiums, excess amounts, and loss cover options
 
 4. **Customer Creation**
    - Creates new customers in the MGU system
-   - Uses endpoint: `/sbapi/v1/newCustomer`
+   - Uses endpoint: `/v2/customer` (POST)
    - Validates all required fields according to TGadgetCustomer specification
    - Handles field length validation per Swagger spec
    - **Note**: Works fine for new customers, fails for duplicates (awaiting API fix from Russell)
 
 5. **Basket Management**
    - Opens baskets for customers
-   - Uses endpoint: `/sbapi/v1/openBasket`
+   - Uses endpoint: `/v2/openBasket`
    - Supports premium periods (Month/Annual) and loss cover options
 
 6. **Gadget Addition**
    - Adds gadgets to baskets
-   - Uses endpoint: `/sbapi/v1/addGadgets`
-   - Supports multiple gadgets per basket
+   - Uses endpoint: `/v2/insureGadget` or `/v2/insureGadgets`
+   - Supports single gadget or multiple gadgets per basket
 
 7. **Basket Confirmation**
    - Confirms baskets for payment
-   - Uses endpoint: `/sbapi/v1/confirm`
+   - Uses endpoint: `/v2/confirm`
    - Returns payment status and requirements
 
 8. **Payment Processing**
    - Supports direct debit payments
-   - Uses endpoint: `/sbapi/v1/payByDirectDebit`
+   - Uses endpoint: `/v2/payByDirectDebit` (POST)
    - Validates bank account details
 
 ### 🔧 Current Issues

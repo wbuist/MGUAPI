@@ -374,34 +374,6 @@ class MGU_API_Client {
     }
 
     /**
-     * Get premiums for a specific gadget.
-     *
-     * @since    1.0.0
-     * @param    integer   $premium_id    The premium ID.
-     * @return   array|WP_Error          The API response or WP_Error on failure.
-     */
-    public function get_gadget_premium($premium_id) {
-        return $this->make_request('gadgetPremium', 'GET', array('premiumId' => $premium_id));
-    }
-
-    /**
-     * Get premiums for a model.
-     *
-     * @since    1.0.0
-     * @param    integer   $manufacturer_id    The manufacturer ID.
-     * @param    string    $gadget_type        The gadget type.
-     * @param    string    $model              The model name.
-     * @return   array|WP_Error               The API response or WP_Error on failure.
-     */
-    public function get_gadget_premiums($manufacturer_id, $gadget_type, $model) {
-        return $this->make_request('gadgetPremiums', 'GET', array(
-            'ManufacturerId' => $manufacturer_id,
-            'GadgetType' => $gadget_type,
-            'Model' => $model
-        ));
-    }
-
-    /**
      * Confirm the basket.
      *
      * @since    1.0.0
@@ -542,31 +514,7 @@ class MGU_API_Client {
      * Test the API connection
      */
     public function test_connection() {
-        return $this->make_request('/sbapi/v1/manufacturers', 'GET');
-    }
-
-    /**
-     * Get a quote for a device
-     *
-     * @param array $device_data
-     * @return array|WP_Error
-     */
-    public function get_quote($device_data) {
-        return $this->make_request('/sbapi/v1/gadgetPremiums', 'GET', array(
-            'ManufacturerId' => $device_data['ManufacturerID'],
-            'GadgetType' => $device_data['GadgetType'],
-            'Model' => $device_data['Model']
-        ));
-    }
-
-    /**
-     * Create a new policy
-     *
-     * @param array $policy_data
-     * @return array|WP_Error
-     */
-    public function create_policy($policy_data) {
-        return $this->make_request('/sbapi/v1/policies', 'POST', $policy_data);
+        return $this->make_request('/v2/manufacturers', 'GET');
     }
 
 } 

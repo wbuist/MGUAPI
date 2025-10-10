@@ -40,31 +40,61 @@ jQuery(document).ready(function($) {
                 console.log('Manufacturers response:', response);
                 console.log('Response success:', response.success);
                 console.log('Response data:', response.data);
+                
                 if (response.success && response.data && response.data.value) {
                     const manufacturers = response.data.value || [];
-                    // Sort manufacturers alphabetically by name
-                    manufacturers.sort(function(a, b) {
-                        return a.name.localeCompare(b.name);
-                    });
                     
-                    const select = $('#manufacturer-select');
-                    select.empty().append('<option value="">Select a manufacturer...</option>');
-                    
-                    manufacturers.forEach(function(manufacturer) {
-                        select.append(`<option value="${manufacturer.id}">${manufacturer.name}</option>`);
-                    });
-                    
-                    $('#step-manufacturer .mgu-api-step-result').removeClass('error success').empty();
+                    if (manufacturers.length > 0) {
+                        // Clear and populate dropdown
+                        const select = $('#manufacturer-select');
+                        select.empty().append('<option value="">Select a manufacturer...</option>');
+                        
+                        // Sort manufacturers alphabetically by name
+                        manufacturers.sort(function(a, b) {
+                            return a.name.localeCompare(b.name);
+                        });
+                        
+                        manufacturers.forEach(function(manufacturer) {
+                            select.append(`<option value="${manufacturer.id}">${manufacturer.name}</option>`);
+                        });
+                        
+                        // Clear error message on success
+                        $('#step-manufacturer .mgu-api-step-result').removeClass('error success').empty();
+                        console.log('Successfully loaded ' + manufacturers.length + ' manufacturers');
+                    } else {
+                        // No manufacturers returned - clear dropdown and show error
+                        const select = $('#manufacturer-select');
+                        select.empty().append('<option value="">Select a manufacturer...</option>');
+                        
+                        console.log('No manufacturers available for gadget type:', gadgetType);
+                        $('#step-manufacturer .mgu-api-step-result').removeClass('success').addClass('error')
+                            .text('No manufacturers available for this gadget type');
+                    }
                 } else {
-                    console.log('Manufacturers failed - response:', response);
+                    // Response failed - show error but allow retry
+                    console.log('Manufacturers request failed - response:', response);
                     $('#step-manufacturer .mgu-api-step-result').removeClass('success').addClass('error')
-                        .text('Failed to load manufacturers: ' + (response.data || 'Unknown error'));
+                        .html('Failed to load manufacturers. <a href="#" class="retry-manufacturers">Click to retry</a>');
+                    
+                    // Add retry handler
+                    $('.retry-manufacturers').on('click', function(e) {
+                        e.preventDefault();
+                        $('#step-manufacturer .mgu-api-step-result').removeClass('error success').empty();
+                        $('#gadget-type-select').trigger('change'); // Retrigger the manufacturers load
+                    });
                 }
             },
             error: function(xhr, status, error) {
                 console.error('Manufacturers error:', {xhr, status, error});
                 $('#step-manufacturer .mgu-api-step-result').removeClass('success').addClass('error')
-                    .text('Failed to load manufacturers');
+                    .html('Failed to load manufacturers. <a href="#" class="retry-manufacturers">Click to retry</a>');
+                
+                // Add retry handler
+                $('.retry-manufacturers').on('click', function(e) {
+                    e.preventDefault();
+                    $('#step-manufacturer .mgu-api-step-result').removeClass('error success').empty();
+                    $('#gadget-type-select').trigger('change'); // Retrigger the manufacturers load
+                });
             }
         });
     });
@@ -101,24 +131,35 @@ jQuery(document).ready(function($) {
                 console.log('Models response:', response);
                 console.log('Models response success:', response.success);
                 console.log('Models response data:', response.data);
+                
+                const select = $('#model-select');
+                select.empty().append('<option value="">Select a model...</option>');
+                
                 if (response.success && response.data && response.data.value) {
                     const models = response.data.value || [];
                     
-                    // Reverse the array order since API returns in correct order but we want last first
-                    models.reverse();
-                    
-                    const select = $('#model-select');
-                    select.empty().append('<option value="">Select a model...</option>');
-                    
-                    models.forEach(function(model) {
-                        // Handle V2 API response structure
-                        const modelId = model.id;
-                        const modelName = model.productName || model.name || model.model || 'Unknown Model';
-                        select.append(`<option value="${modelId}">${modelName}</option>`);
-                    });
-                    
-                    $('#step-model .mgu-api-step-result').removeClass('error success').empty();
+                    if (models.length > 0) {
+                        // Reverse the array order since API returns in correct order but we want last first
+                        models.reverse();
+                        
+                        models.forEach(function(model) {
+                            // Handle V2 API response structure
+                            const modelId = model.id;
+                            const modelName = model.productName || model.name || model.model || 'Unknown Model';
+                            select.append(`<option value="${modelId}">${modelName}</option>`);
+                        });
+                        
+                        // Clear error message on success
+                        $('#step-model .mgu-api-step-result').removeClass('error success').empty();
+                        console.log('Successfully loaded ' + models.length + ' models');
+                    } else {
+                        // No models returned
+                        console.log('No models available for this manufacturer and gadget type');
+                        $('#step-model .mgu-api-step-result').removeClass('success').addClass('error')
+                            .text('No models available for this manufacturer');
+                    }
                 } else {
+                    // Only show error if we didn't get models
                     console.log('Models failed - response:', response);
                     $('#step-model .mgu-api-step-result').removeClass('success').addClass('error')
                         .text('Failed to load models: ' + (response.data || 'Unknown error'));
@@ -372,14 +413,13 @@ jQuery(document).ready(function($) {
         console.log('DEBUG - Customer data being sent:', JSON.stringify(customerData, null, 2));
         console.log('DEBUG - Current quote data:', JSON.stringify(window.currentQuoteData, null, 2));
 
-        // Create the customer with payment details
+        // Create the customer (V2 API - payment happens later in the flow)
         $.ajax({
             url: mgu_api.ajax_url,
             type: 'POST',
             data: {
                 action: 'mgu_api_create_customer',
                 customer_data: customerData,
-                payment_data: paymentData,
                 nonce: mgu_api.nonce
             },
             success: function(response) {
@@ -411,21 +451,10 @@ jQuery(document).ready(function($) {
                             console.log('DEBUG - Basket opened:', basketResponse);
                             if (basketResponse.success && basketResponse.data && basketResponse.data.value) {
                                 const basketId = basketResponse.data.value;
+                                console.log('DEBUG - Basket ID:', basketId);
                                 
-                                // Add gadget to basket
-                                const gadgetData = {
-                                    premiumId: parseInt(window.currentQuoteId), // REQUIRED - from quote response, must be integer
-                                    status: "New", // enum: Unknown, Deleted, NotActive, New, Saved, Active, Cancelled, Completed
-                                    gadgetType: window.selectedQuoteOption.gadgetType, // enum
-                                    make: window.selectedQuoteOption.make, // string
-                                    model: window.selectedQuoteOption.model, // string
-                                    dateOfPurchase: $('#device-purchase-date').val() || new Date().toISOString().split('T')[0], // date format
-                                    serialNumber: "", // string - could be collected from user
-                                    installedMemory: (window.selectedQuoteOption.standardMemory || '') + (window.selectedQuoteOption.memorySize || ''), // string
-                                    purchasePrice: parseFloat($('#device-purchase-price').val()) || 0 // number
-                                };
-                                
-                                console.log('DEBUG - Gadget data being sent:', JSON.stringify(gadgetData, null, 2));
+                                // Add gadget to basket using V2 API data
+                                console.log('DEBUG - Adding gadget with product ID:', window.currentQuoteData.productId);
                                 
                                 $.ajax({
                                     url: mgu_api.ajax_url,
