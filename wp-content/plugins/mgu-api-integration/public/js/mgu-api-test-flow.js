@@ -85,13 +85,13 @@ jQuery(document).ready(function($) {
                         $('#step-manufacturer .mgu-api-step-result').removeClass('error success').empty();
                         console.log('Successfully loaded ' + manufacturers.length + ' manufacturers');
                     } else {
-                        // No manufacturers returned - clear dropdown and show error
+                        // No manufacturers returned - clear dropdown but don't show error (this is a valid empty result)
                         const select = $('#manufacturer-select');
                         select.empty().append('<option value="">Select a manufacturer...</option>');
                         
                         console.log('No manufacturers available for gadget type:', gadgetType);
-                        $('#step-manufacturer .mgu-api-step-result').removeClass('success').addClass('error')
-                            .text('No manufacturers available for this gadget type');
+                        // Clear any existing messages - empty results are not errors
+                        $('#step-manufacturer .mgu-api-step-result').removeClass('error success').empty();
                     }
                 } else {
                     // Response failed - show error but allow retry
@@ -181,10 +181,10 @@ jQuery(document).ready(function($) {
                         $('#step-model .mgu-api-step-result').removeClass('error success').empty();
                         console.log('Successfully loaded ' + models.length + ' models');
                     } else {
-                        // No models returned
+                        // No models returned - clear dropdown but don't show error (this is a valid empty result)
                         console.log('No models available for this manufacturer and gadget type');
-                        $('#step-model .mgu-api-step-result').removeClass('success').addClass('error')
-                            .text('No models available for this manufacturer');
+                        // Clear any existing messages - empty results are not errors
+                        $('#step-model .mgu-api-step-result').removeClass('error success').empty();
                     }
                 } else {
                     // Only show error if we didn't get models
