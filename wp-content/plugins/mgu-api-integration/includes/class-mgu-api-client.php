@@ -72,8 +72,18 @@ class MGU_API_Client {
             $this->client_secret = get_option('mgu_api_client_secret', '');
         }
         
-        $this->access_token = '';
-        $this->token_expiry = 0;
+        // Check for existing valid token in transients
+        $this->access_token = get_transient('mgu_api_access_token');
+        $this->token_expiry = get_transient('mgu_api_token_expiry');
+        
+        // If no valid token, get one
+        if (empty($this->access_token) || time() >= $this->token_expiry - 300) {
+            error_log('MGU API Debug - No valid token found, refreshing...');
+            $this->refresh_token();
+        } else {
+            error_log('MGU API Debug - Using cached token, expires in: ' . ($this->token_expiry - time()) . ' seconds');
+        }
+        
         $this->logger = new MGU_API_Logger();
 
         error_log('MGU API Debug - Constructor values:');
@@ -86,8 +96,9 @@ class MGU_API_Client {
      * Get a valid access token, refreshing if necessary
      */
     private function get_valid_token() {
-        // Check if we need to refresh the token
+        // Token should already be valid from constructor, but double-check
         if (empty($this->access_token) || time() >= $this->token_expiry - 300) { // Refresh 5 minutes before expiry
+            error_log('MGU API Debug - Token expired during request, refreshing...');
             $this->refresh_token();
         }
         return $this->access_token;
@@ -148,7 +159,13 @@ class MGU_API_Client {
         $this->access_token = $data['access_token'];
         $this->token_expiry = time() + $data['expires_in'];
         
+        // Store token in transients for persistence across requests
+        $cache_duration = $data['expires_in'] - 300; // Cache for 5 minutes less than expiry
+        set_transient('mgu_api_access_token', $this->access_token, $cache_duration);
+        set_transient('mgu_api_token_expiry', $this->token_expiry, $cache_duration);
+        
         error_log('MGU API Debug - Token refresh successful, expires in: ' . $data['expires_in'] . ' seconds');
+        error_log('MGU API Debug - Token cached for: ' . $cache_duration . ' seconds');
         return true;
     }
 
@@ -223,7 +240,10 @@ class MGU_API_Client {
 
         // Handle token expiration
         if ($response_code === 401) {
-            error_log('MGU API Debug - Token expired, attempting refresh');
+            error_log('MGU API Debug - Token expired, clearing cache and attempting refresh');
+            // Clear cached token
+            delete_transient('mgu_api_access_token');
+            delete_transient('mgu_api_token_expiry');
             $this->access_token = null; // Force token refresh
             return $this->make_request($endpoint, $method, $data); // Retry with original data
         }
