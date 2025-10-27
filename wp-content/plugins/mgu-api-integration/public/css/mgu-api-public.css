@@ -241,4 +241,15 @@
     border-top: 3px solid transparent;
     border-radius: 50%;
     animation: mgu-spin 1s linear infinite;
+}
+
+/* Ensure loss cover checkbox is always clickable */
+#policy-loss-cover {
+    pointer-events: auto !important;
+    cursor: pointer !important;
+}
+
+#policy-loss-cover:disabled {
+    pointer-events: auto !important;
+    cursor: pointer !important;
 } 

@@ -91,21 +91,42 @@ $api_client = new MGU_API_Client();
                         <!-- Populated dynamically with premium amounts -->
                     </div>
                 </div>
-                <!-- Loss Cover Option -->
-                <div id="loss-cover-container" class="mgu-api-form-group" style="display: none;">
-                    <label>
-                        <input type="checkbox" id="loss-cover-checkbox" name="loss-cover" value="yes">
-                        Add Loss Cover Protection
-                    </label>
-                    <div id="loss-cover-pricing" style="margin-top: 10px; font-size: 0.9em; color: #666;">
-                        <!-- Populated dynamically with loss cover pricing -->
-                    </div>
-                </div>
-                <button type="submit" id="get-quote-btn" class="mgu-api-button" disabled>Buy Policy</button>
+                <button type="submit" id="get-quote-btn" class="mgu-api-button" disabled>Add to Quote</button>
             </form>
             <div class="mgu-api-step-result"></div>
         </div>
 
+        <!-- Step 5: Quote Summary -->
+        <div id="step-quote" class="mgu-api-step" style="display: none;">
+            <h3>Step 5: Review Your Quote</h3>
+            
+            <!-- Gadget List -->
+            <div id="gadget-list" class="mgu-api-gadget-list">
+                <!-- Populated dynamically -->
+            </div>
+            
+            <!-- Loss Cover Option (Policy Level) -->
+            <div class="mgu-api-form-group">
+                <label>
+                    <input type="checkbox" id="policy-loss-cover" name="policy-loss-cover" value="yes">
+                    Add Loss Cover Protection (applies to all gadgets)
+                </label>
+                <div id="policy-loss-cover-info" style="margin-top: 10px;">
+                    <!-- Loss cover pricing -->
+                </div>
+            </div>
+            
+            <!-- Total Premium Display -->
+            <div id="total-premium-display" class="mgu-api-total-premium">
+                <!-- Total premium -->
+            </div>
+            
+            <!-- Action Buttons -->
+            <button type="button" id="add-another-gadget" class="mgu-api-button mgu-api-button-secondary">Add Another Gadget</button>
+            <button type="button" id="proceed-to-policy" class="mgu-api-button">Buy Policy</button>
+            
+            <div class="mgu-api-step-result"></div>
+        </div>
 
         <!-- Step 5.5: Add Another Gadget -->
         <div id="step-add-gadget" class="mgu-api-step" style="display: none;">

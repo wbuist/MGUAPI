@@ -131,6 +131,15 @@ class MGU_API {
         
         add_action('wp_ajax_mgu_api_pay_by_direct_debit', array($this, 'ajax_pay_by_direct_debit'));
         add_action('wp_ajax_nopriv_mgu_api_pay_by_direct_debit', array($this, 'ajax_pay_by_direct_debit'));
+        
+        add_action('wp_ajax_mgu_api_add_loss_cover', array($this, 'ajax_add_loss_cover'));
+        add_action('wp_ajax_nopriv_mgu_api_add_loss_cover', array($this, 'ajax_add_loss_cover'));
+        
+        add_action('wp_ajax_mgu_api_remove_loss_cover', array($this, 'ajax_remove_loss_cover'));
+        add_action('wp_ajax_nopriv_mgu_api_remove_loss_cover', array($this, 'ajax_remove_loss_cover'));
+        
+        add_action('wp_ajax_mgu_api_get_basket', array($this, 'ajax_get_basket'));
+        add_action('wp_ajax_nopriv_mgu_api_get_basket', array($this, 'ajax_get_basket'));
     }
 
     /**
@@ -1021,5 +1030,119 @@ class MGU_API {
         }
         
         return 'https://sandbox.api.mygadgetumbrella.com/sbauth';
+    }
+    
+    /**
+     * AJAX handler for adding loss cover to basket
+     */
+    public function ajax_add_loss_cover() {
+        error_log('=== Add Loss Cover Debug ===');
+        error_log('AJAX request received for adding loss cover');
+        error_log('POST data: ' . print_r($_POST, true));
+        
+        // Verify nonce
+        if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'mgu_api_nonce')) {
+            error_log('Nonce verification failed for adding loss cover');
+            wp_send_json_error('Invalid security token');
+            return;
+        }
+        
+        $basket_id = isset($_POST['basket_id']) ? intval($_POST['basket_id']) : 0;
+        
+        if (!$basket_id) {
+            error_log('Missing basket ID for adding loss cover');
+            wp_send_json_error('Missing basket ID');
+            return;
+        }
+        
+        error_log('Adding loss cover to basket: ' . $basket_id);
+        $api_client = new MGU_API_Client();
+        $response = $api_client->add_loss_cover($basket_id);
+        
+        if (is_wp_error($response)) {
+            error_log('Error adding loss cover: ' . $response->get_error_message());
+            wp_send_json_error($response->get_error_message());
+            return;
+        }
+        
+        error_log('Loss cover added successfully: ' . print_r($response, true));
+        error_log('=== End Add Loss Cover Debug ===');
+        wp_send_json_success($response);
+    }
+    
+    /**
+     * AJAX handler for removing loss cover from basket
+     */
+    public function ajax_remove_loss_cover() {
+        error_log('=== Remove Loss Cover Debug ===');
+        error_log('AJAX request received for removing loss cover');
+        error_log('POST data: ' . print_r($_POST, true));
+        
+        // Verify nonce
+        if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'mgu_api_nonce')) {
+            error_log('Nonce verification failed for removing loss cover');
+            wp_send_json_error('Invalid security token');
+            return;
+        }
+        
+        $basket_id = isset($_POST['basket_id']) ? intval($_POST['basket_id']) : 0;
+        
+        if (!$basket_id) {
+            error_log('Missing basket ID for removing loss cover');
+            wp_send_json_error('Missing basket ID');
+            return;
+        }
+        
+        error_log('Removing loss cover from basket: ' . $basket_id);
+        $api_client = new MGU_API_Client();
+        $response = $api_client->remove_loss_cover($basket_id);
+        
+        if (is_wp_error($response)) {
+            error_log('Error removing loss cover: ' . $response->get_error_message());
+            wp_send_json_error($response->get_error_message());
+            return;
+        }
+        
+        error_log('Loss cover removed successfully: ' . print_r($response, true));
+        error_log('=== End Remove Loss Cover Debug ===');
+        wp_send_json_success($response);
+    }
+    
+    /**
+     * AJAX handler for getting basket data
+     */
+    public function ajax_get_basket() {
+        error_log('=== Get Basket Debug ===');
+        error_log('AJAX request received for getting basket');
+        error_log('POST data: ' . print_r($_POST, true));
+        
+        // Verify nonce
+        if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'mgu_api_nonce')) {
+            error_log('Nonce verification failed for getting basket');
+            wp_send_json_error('Invalid security token');
+            return;
+        }
+        
+        $basket_id = isset($_POST['basket_id']) ? intval($_POST['basket_id']) : 0;
+        
+        if (!$basket_id) {
+            error_log('Missing basket ID for getting basket');
+            wp_send_json_error('Missing basket ID');
+            return;
+        }
+        
+        error_log('Getting basket data for basket: ' . $basket_id);
+        $api_client = new MGU_API_Client();
+        $response = $api_client->get_basket($basket_id);
+        
+        if (is_wp_error($response)) {
+            error_log('Error getting basket: ' . $response->get_error_message());
+            wp_send_json_error($response->get_error_message());
+            return;
+        }
+        
+        error_log('Basket data retrieved successfully: ' . print_r($response, true));
+        error_log('=== End Get Basket Debug ===');
+        wp_send_json_success($response);
     }
 } 
