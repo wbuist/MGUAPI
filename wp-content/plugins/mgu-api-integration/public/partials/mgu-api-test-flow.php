@@ -91,7 +91,17 @@ $api_client = new MGU_API_Client();
                         <!-- Populated dynamically with premium amounts -->
                     </div>
                 </div>
-                <button type="submit" id="get-quote-btn" class="mgu-api-button" disabled>Get Quote</button>
+                <!-- Loss Cover Option -->
+                <div id="loss-cover-container" class="mgu-api-form-group" style="display: none;">
+                    <label>
+                        <input type="checkbox" id="loss-cover-checkbox" name="loss-cover" value="yes">
+                        Add Loss Cover Protection
+                    </label>
+                    <div id="loss-cover-pricing" style="margin-top: 10px; font-size: 0.9em; color: #666;">
+                        <!-- Populated dynamically with loss cover pricing -->
+                    </div>
+                </div>
+                <button type="submit" id="get-quote-btn" class="mgu-api-button" disabled>Buy Policy</button>
             </form>
             <div class="mgu-api-step-result"></div>
         </div>

@@ -476,7 +476,7 @@ jQuery(document).ready(function($) {
                             action: 'mgu_api_open_basket',
                             customer_id: customerId,
                             premium_period: $('input[name="premium-period"]:checked').val() || 'Annual',
-                            include_loss_cover: window.currentQuoteData.lossCoverAvailable ? 'Yes' : 'No',
+                            include_loss_cover: $('#loss-cover-checkbox').is(':checked') ? 'Yes' : 'No',
                             nonce: mgu_api.nonce
                         },
                         success: function(basketResponse) {
@@ -737,6 +737,33 @@ jQuery(document).ready(function($) {
                     $('#premium-period-buttons').append(monthlyHtml).append(annualHtml);
                     console.log('DEBUG - Premium period buttons added');
                     
+                    // Check if loss cover is available and show option
+                    if (quoteData.lossCoverAvailable) {
+                        $('#loss-cover-container').show();
+                        
+                        // Populate loss cover pricing information
+                        const lossCoverMonthly = quoteData.lossCoverMonthlyPremium || 0;
+                        const lossCoverAnnual = quoteData.lossCoverAnnualPremium || 0;
+                        
+                        const lossCoverPricingHtml = `
+                            <div style="margin-top: 5px;">
+                                <strong>Loss Cover Pricing:</strong><br>
+                                Monthly: +£${lossCoverMonthly.toFixed(2)} | Annual: +£${lossCoverAnnual.toFixed(2)}
+                            </div>
+                        `;
+                        $('#loss-cover-pricing').html(lossCoverPricingHtml);
+                        
+                        // Add event handler for loss cover checkbox
+                        $('#loss-cover-checkbox').off('change').on('change', function() {
+                            updatePremiumDisplay();
+                        });
+                        
+                        console.log('DEBUG - Loss cover option shown');
+                    } else {
+                        $('#loss-cover-container').hide();
+                        console.log('DEBUG - Loss cover not available');
+                    }
+                    
                     // Add click handler for premium period options
                     $('.mgu-api-radio-option').on('click', function() {
                         $(this).addClass('selected').siblings().removeClass('selected');
@@ -761,6 +788,37 @@ jQuery(document).ready(function($) {
         });
     }
     
+    // Function to update premium display based on loss cover selection
+    function updatePremiumDisplay() {
+        if (!window.currentQuoteData) return;
+        
+        const isLossCoverSelected = $('#loss-cover-checkbox').is(':checked');
+        const monthlyPremium = window.currentQuoteData.monthlyPremium || 0;
+        const annualPremium = window.currentQuoteData.annualPremium || 0;
+        const lossCoverMonthly = window.currentQuoteData.lossCoverMonthlyPremium || 0;
+        const lossCoverAnnual = window.currentQuoteData.lossCoverAnnualPremium || 0;
+        
+        // Update monthly premium display
+        const monthlyLabel = $('#premium-monthly').next('label');
+        if (isLossCoverSelected) {
+            const totalMonthly = monthlyPremium + lossCoverMonthly;
+            monthlyLabel.html(`Monthly - £${totalMonthly.toFixed(2)} (£${monthlyPremium.toFixed(2)} + £${lossCoverMonthly.toFixed(2)} loss cover)`);
+        } else {
+            monthlyLabel.html(`Monthly - £${monthlyPremium.toFixed(2)}`);
+        }
+        
+        // Update annual premium display
+        const annualLabel = $('#premium-annual').next('label');
+        if (isLossCoverSelected) {
+            const totalAnnual = annualPremium + lossCoverAnnual;
+            annualLabel.html(`Annual - £${totalAnnual.toFixed(2)} (£${annualPremium.toFixed(2)} + £${lossCoverAnnual.toFixed(2)} loss cover)`);
+        } else {
+            annualLabel.html(`Annual - £${annualPremium.toFixed(2)}`);
+        }
+        
+        console.log('DEBUG - Premium display updated, loss cover selected:', isLossCoverSelected);
+    }
+    
     // Function to reset device form
     function resetDeviceForm() {
         $('#device-form')[0].reset();
@@ -772,6 +830,8 @@ jQuery(document).ready(function($) {
         $('#memory-radio-buttons').empty();
         $('#premium-period-container').hide();
         $('#premium-period-buttons').empty();
+        $('#loss-cover-container').hide();
+        $('#loss-cover-pricing').empty();
         $('#get-quote-btn').prop('disabled', true);
         $('#step-device .mgu-api-step-result').removeClass('error success').empty();
     }
