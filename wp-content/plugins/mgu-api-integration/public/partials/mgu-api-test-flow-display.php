@@ -6,7 +6,7 @@ if (!defined('ABSPATH')) {
 
 <div class="mgu-api-test-flow">
     <div class="mgu-api-step" id="step-gadget-type">
-        <h3>Step 1: Select Device Type</h3>
+        <h3>Select Device Type</h3>
         <select id="gadget-type-select" class="mgu-api-select">
             <option value="">Select a device type...</option>
             <option value="MobilePhone">Mobile Phone</option>
@@ -20,7 +20,7 @@ if (!defined('ABSPATH')) {
     </div>
 
     <div class="mgu-api-step" id="step-manufacturer" style="display: none;">
-        <h3>Step 2: Select Manufacturer</h3>
+        <h3>Select Manufacturer</h3>
         <select id="manufacturer-select" class="mgu-api-select">
             <option value="">Select a manufacturer...</option>
         </select>
@@ -36,7 +36,7 @@ if (!defined('ABSPATH')) {
     </div>
 
     <div class="mgu-api-step" id="step-device" style="display: none;">
-        <h3>Step 4: Device Details</h3>
+        <h3>Device Details</h3>
         <form id="device-form">
             <div class="mgu-api-form-group">
                 <label for="device-purchase-date">Purchase Date</label>
@@ -52,14 +52,14 @@ if (!defined('ABSPATH')) {
     </div>
 
     <div class="mgu-api-step" id="step-quote" style="display: none;">
-        <h3>Step 5: Review Quote</h3>
+        <h3>Review Quote</h3>
         <div class="mgu-api-quote-details"></div>
         <button id="accept-quote" class="mgu-api-button">Accept Quote</button>
         <div class="mgu-api-step-result"></div>
     </div>
 
     <div class="mgu-api-step" id="step-policy" style="display: none;">
-        <h3>Step 6: Create Policy</h3>
+        <h3>Create Policy</h3>
         <form id="policy-form">
             <div class="mgu-api-form-group">
                 <label for="policy-first-name">First Name</label>
