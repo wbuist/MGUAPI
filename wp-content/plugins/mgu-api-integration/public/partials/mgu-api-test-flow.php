@@ -27,7 +27,7 @@ $api_client = new MGU_API_Client();
     <div class="mgu-api-steps">
         <!-- Step 1: Gadget Type Selection -->
         <div id="step-gadget-type" class="mgu-api-step">
-            <h3>Step 1: Select Gadget Type</h3>
+            <h3>Select Gadget Type</h3>
             <div class="mgu-api-form-group">
                 <select id="gadget-type-select" class="mgu-api-select">
                     <option value="">Select a gadget type...</option>
@@ -44,7 +44,7 @@ $api_client = new MGU_API_Client();
 
         <!-- Step 2: Manufacturer Selection -->
         <div class="mgu-api-step" id="step-manufacturer" style="display: none;">
-            <h3>Step 2: Select Manufacturer</h3>
+            <h3>Select Manufacturer</h3>
             <select id="manufacturer-select" class="mgu-api-select">
                 <option value="">Select a manufacturer...</option>
             </select>
@@ -53,7 +53,7 @@ $api_client = new MGU_API_Client();
 
         <!-- Step 3: Model Selection -->
         <div class="mgu-api-step" id="step-model" style="display: none;">
-            <h3>Step 3: Select Model</h3>
+            <h3>Select Model</h3>
             <select id="model-select" class="mgu-api-select">
                 <option value="">Select a model...</option>
             </select>
@@ -62,7 +62,7 @@ $api_client = new MGU_API_Client();
 
         <!-- Step 4: Device Details -->
         <div id="step-device" class="mgu-api-step" style="display: none;">
-            <h3>Step 4: Device Details</h3>
+            <h3>Device Details</h3>
             <form id="device-form" class="mgu-api-form">
                 <div class="mgu-api-form-group">
                     <label for="device-purchase-date">Purchase Date (Required)</label>
@@ -98,7 +98,7 @@ $api_client = new MGU_API_Client();
 
         <!-- Step 5: Quote Summary -->
         <div id="step-quote" class="mgu-api-step" style="display: none;">
-            <h3>Step 5: Review Your Quote</h3>
+            <h3>Review Your Quote</h3>
             
             <!-- Gadget List -->
             <div id="gadget-list" class="mgu-api-gadget-list">
@@ -176,7 +176,7 @@ $api_client = new MGU_API_Client();
 
         <!-- Step 6: Policy Creation -->
         <div class="mgu-api-step" id="step-policy" style="display: none;">
-            <h3>Step 6: Create Policy</h3>
+            <h3>Create Policy</h3>
             <form id="policy-form" class="mgu-api-form">
                 <div class="form-group">
                     <label for="policy-first-name">First Name</label>
