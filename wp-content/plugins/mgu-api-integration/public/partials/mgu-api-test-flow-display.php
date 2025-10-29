@@ -28,7 +28,7 @@ if (!defined('ABSPATH')) {
     </div>
 
     <div class="mgu-api-step" id="step-model" style="display: none;">
-        <h3>Step 3: Select Model</h3>
+        <h3>Select Model</h3>
         <select id="model-select" class="mgu-api-select">
             <option value="">Select a model...</option>
         </select>
