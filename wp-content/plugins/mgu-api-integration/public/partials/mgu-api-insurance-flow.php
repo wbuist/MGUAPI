@@ -20,9 +20,9 @@ if (!defined('WPINC')) {
 $api_client = new MGU_API_Client();
 ?>
 
-<div class="mgu-api-test-flow">
-    <h2>MGU API V2 Insurance Policy Flow Test</h2>
-    <p class="mgu-api-description">Test the enhanced V2 API features including multiple gadgets, loss cover options, and improved customer management.</p>
+<div class="mgu-api-insurance-flow">
+    <h2>MGU Insurance Policy Flow</h2>
+    <p class="mgu-api-description">Get a quote for your gadget insurance with multiple gadgets, loss cover options, and comprehensive coverage.</p>
 
     <div class="mgu-api-steps">
         <!-- Step 1: Gadget Type Selection -->

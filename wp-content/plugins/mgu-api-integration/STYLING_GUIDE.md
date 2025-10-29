@@ -23,11 +23,11 @@ This guide provides comprehensive documentation for customizing the appearance o
 
 ## Core Container Classes
 
-### `.mgu-api-test-flow`
+### `.mgu-api-insurance-flow`
 **Main container for the entire plugin**
 
 ```css
-.mgu-api-test-flow {
+.mgu-api-insurance-flow {
     max-width: 800px;
     margin: 2em auto;
     padding: 20px;
@@ -511,7 +511,7 @@ This guide provides comprehensive documentation for customizing the appearance o
 
 ```css
 @media (max-width: 768px) {
-    .mgu-api-test-flow {
+    .mgu-api-insurance-flow {
         margin: 1em;
         padding: 15px;
     }
@@ -535,7 +535,7 @@ This guide provides comprehensive documentation for customizing the appearance o
 
 ```css
 @media (min-width: 769px) and (max-width: 1024px) {
-    .mgu-api-test-flow {
+    .mgu-api-insurance-flow {
         max-width: 90%;
     }
 }
@@ -548,7 +548,7 @@ This guide provides comprehensive documentation for customizing the appearance o
 ### Example 1: Dark Theme
 
 ```css
-.mgu-api-test-flow {
+.mgu-api-insurance-flow {
     background: #2c3e50;
     color: #ecf0f1;
 }
@@ -570,7 +570,7 @@ This guide provides comprehensive documentation for customizing the appearance o
 ### Example 2: Minimal Design
 
 ```css
-.mgu-api-test-flow {
+.mgu-api-insurance-flow {
     box-shadow: none;
     border: 1px solid #e0e0e0;
 }
@@ -590,7 +590,7 @@ This guide provides comprehensive documentation for customizing the appearance o
 ### Example 3: Colorful Theme
 
 ```css
-.mgu-api-test-flow {
+.mgu-api-insurance-flow {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
 }

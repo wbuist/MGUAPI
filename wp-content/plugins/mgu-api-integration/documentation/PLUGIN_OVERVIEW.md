@@ -84,8 +84,8 @@ The MGU API Integration plugin is a WordPress plugin that provides integration w
 ### Key Files
 - `includes/class-mgu-api.php` - Main plugin logic and AJAX handlers
 - `includes/class-mgu-api-client.php` - API communication
-- `public/js/mgu-api-test-flow.js` - Frontend JavaScript
-- `public/partials/mgu-api-test-flow.php` - Frontend HTML template
+- `public/js/mgu-api-insurance-flow.js` - Frontend JavaScript
+- `public/partials/mgu-api-insurance-flow.php` - Frontend HTML template
 
 ### Configuration
 - API endpoint configuration via WordPress admin

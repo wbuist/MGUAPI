@@ -73,15 +73,15 @@ class MGU_API_Public {
      */
     public function enqueue_scripts() {
         wp_enqueue_script(
-            'mgu-api-test-flow',
-            plugin_dir_url(__FILE__) . '../public/js/mgu-api-test-flow.js',
+            'mgu-api-insurance-flow',
+            plugin_dir_url(__FILE__) . '../public/js/mgu-api-insurance-flow.js',
             array('jquery'),
             $this->version,
             true
         );
 
         wp_localize_script(
-            'mgu-api-test-flow',
+            'mgu-api-insurance-flow',
             'mgu_api',
             array(
                 'ajax_url' => admin_url('admin-ajax.php'),

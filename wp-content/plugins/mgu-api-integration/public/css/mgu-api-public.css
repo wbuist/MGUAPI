@@ -1,4 +1,4 @@
-.mgu-api-test-flow {
+.mgu-api-insurance-flow {
     max-width: 800px;
     margin: 2em auto;
     padding: 20px;
@@ -254,8 +254,8 @@
     cursor: pointer !important;
 }
 
-/* CSS migrated from mgu-api-test-flow.php */
-.mgu-api-test-flow {
+/* CSS migrated from mgu-api-insurance-flow.php */
+.mgu-api-insurance-flow {
     max-width: 800px;
     margin: 2em auto;
     padding: 20px;

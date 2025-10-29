@@ -870,7 +870,7 @@ class MGU_API {
      */
     public function render_test_flow() {
         ob_start();
-        include MGU_API_PLUGIN_DIR . 'public/partials/mgu-api-test-flow.php';
+        include MGU_API_PLUGIN_DIR . 'public/partials/mgu-api-insurance-flow.php';
         return ob_get_clean();
     }
 
@@ -882,8 +882,8 @@ class MGU_API {
         $nonce = wp_create_nonce('mgu_api_nonce');
 
         wp_enqueue_script(
-            'mgu-api-test-flow',
-            MGU_API_PLUGIN_URL . 'public/js/mgu-api-test-flow.js',
+            'mgu-api-insurance-flow',
+            MGU_API_PLUGIN_URL . 'public/js/mgu-api-insurance-flow.js',
             array('jquery'),
             MGU_API_VERSION,
             true
@@ -895,7 +895,7 @@ class MGU_API {
         );
  
         wp_localize_script(
-            'mgu-api-test-flow',
+            'mgu-api-insurance-flow',
             'mgu_api',
             $localized_data
         );
