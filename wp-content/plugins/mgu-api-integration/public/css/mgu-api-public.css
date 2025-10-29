@@ -252,4 +252,236 @@
 #policy-loss-cover:disabled {
     pointer-events: auto !important;
     cursor: pointer !important;
+}
+
+/* CSS migrated from mgu-api-test-flow.php */
+.mgu-api-test-flow {
+    max-width: 800px;
+    margin: 2em auto;
+    padding: 20px;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    font-size: 16px;
+}
+
+.mgu-api-step {
+    margin-bottom: 2em;
+    padding: 20px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.mgu-api-step h3 {
+    margin-top: 0;
+    color: #333;
+    font-size: 1.4em;
+    margin-bottom: 1em;
+}
+
+.mgu-api-select {
+    width: 100%;
+    padding: 12px;
+    margin-bottom: 1em;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 16px;
+    line-height: 1.4;
+    background-color: #fff;
+    cursor: pointer;
+}
+
+.mgu-api-select option {
+    padding: 12px;
+    font-size: 16px;
+    line-height: 1.4;
+}
+
+.mgu-api-form .form-group {
+    margin-bottom: 1.5em;
+}
+
+.mgu-api-form label {
+    display: block;
+    margin-bottom: 0.5em;
+    color: #333;
+    font-size: 1.1em;
+}
+
+.mgu-api-form input {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 16px;
+}
+
+.mgu-api-button {
+    background: #0073aa;
+    color: #fff;
+    padding: 12px 24px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: 500;
+}
+
+.mgu-api-button:hover {
+    background: #005177;
+}
+
+.mgu-api-step-result {
+    margin-top: 1em;
+    padding: 15px;
+    border-radius: 4px;
+    font-size: 16px;
+}
+
+.mgu-api-step-result.success {
+    background: #dff0d8;
+    color: #3c763d;
+}
+
+.mgu-api-step-result.error {
+    background: #f2dede;
+    color: #a94442;
+}
+
+.mgu-api-quote-details {
+    margin: 1em 0;
+    padding: 20px;
+    background: #f9f9f9;
+    border-radius: 4px;
+    font-size: 16px;
+}
+
+.mgu-api-quote-actions {
+    margin: 1em 0;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.mgu-api-button-secondary {
+    background: #6c757d;
+}
+
+.mgu-api-button-secondary:hover {
+    background: #545b62;
+}
+
+.mgu-api-description {
+    margin-bottom: 2em;
+    padding: 15px;
+    background: #e7f3ff;
+    border-left: 4px solid #0073aa;
+    border-radius: 4px;
+    color: #333;
+}
+
+.mgu-api-form-group {
+    margin-bottom: 1.5em;
+}
+
+.mgu-api-form-group label {
+    display: block;
+    margin-bottom: 0.5em;
+    color: #333;
+    font-weight: 500;
+}
+
+.mgu-api-form-group input[type="checkbox"] {
+    width: auto;
+    margin-right: 8px;
+}
+
+.mgu-api-current-basket {
+    margin: 1em 0;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 4px;
+    border: 1px solid #dee2e6;
+}
+
+.mgu-api-basket-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.mgu-api-basket-item:last-child {
+    border-bottom: none;
+}
+
+.mgu-api-remove-item {
+    background: #dc3545;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.mgu-api-remove-item:hover {
+    background: #c82333;
+}
+
+.mgu-api-help-text {
+    display: block;
+    color: #666;
+    font-size: 0.9em;
+    margin-top: 5px;
+}
+
+.mgu-api-radio-group {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.mgu-api-radio-option {
+    display: flex;
+    align-items: center;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.mgu-api-radio-option:hover {
+    background-color: #f5f5f5;
+}
+
+.mgu-api-radio-option input[type="radio"] {
+    margin-right: 10px;
+}
+
+.mgu-api-radio-option.selected {
+    background-color: #e3f2fd;
+    border-color: #2196f3;
+}
+
+.mgu-api-button:disabled,
+.mgu-api-button.disabled {
+    background-color: #ccc !important;
+    color: #666 !important;
+    cursor: not-allowed !important;
+    opacity: 0.6;
+}
+
+.mgu-api-button.enabled {
+    background-color: #007cba !important;
+    color: white !important;
+    cursor: pointer !important;
+    opacity: 1;
+}
+
+.mgu-api-button.enabled:hover {
+    background-color: #005a87 !important;
 } 
